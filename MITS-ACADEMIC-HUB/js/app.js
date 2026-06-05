@@ -328,6 +328,15 @@
 
   /* ── Init ── */
 
+  async function refreshSemesters() {
+    try {
+      await loadSemesters();
+      populateSemesterSelect();
+    } catch {
+      populateSemesterSelect();
+    }
+  }
+
   async function init() {
     window.MITSTheme?.init();
     initNav();
@@ -339,6 +348,9 @@
     } catch {
       populateSemesterSelect();
     }
+
+    window.MITSAdmin?.init();
+    window.MITSAdminAuth?.updateAdminVisibility();
 
     window.MITSCaptcha?.init('captcha-canvas');
     window.MITSSGPA?.init('sgpa-tool');
@@ -355,6 +367,8 @@
       e.target.value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     });
   }
+
+  window.MITSApp = { refreshSemesters, showToast };
 
   document.addEventListener('DOMContentLoaded', init);
 })();

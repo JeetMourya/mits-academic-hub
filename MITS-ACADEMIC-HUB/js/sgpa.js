@@ -4,39 +4,12 @@
 (function () {
   'use strict';
 
-  const GRADE_POINTS = {
-    O: 10, 'A+': 9, A: 8, 'B+': 7, B: 6, C: 5, P: 4, F: 0,
-  };
+  const academic = window.MITSAcademic;
 
-  function parseGrade(value) {
-    const normalized = String(value).trim().toUpperCase();
-    if (normalized in GRADE_POINTS) return GRADE_POINTS[normalized];
-    const num = parseFloat(normalized);
-    if (!isNaN(num) && num >= 0 && num <= 10) return num;
-    return null;
-  }
-
-  function calculate(subjects) {
-    if (!subjects.length) return { sgpa: 0, totalCredits: 0, valid: false };
-
-    let totalPoints = 0;
-    let totalCredits = 0;
-
-    for (const sub of subjects) {
-      const credits = parseFloat(sub.credits);
-      const grade = parseGrade(sub.grade);
-      if (isNaN(credits) || credits <= 0 || grade === null) continue;
-      totalPoints += credits * grade;
-      totalCredits += credits;
-    }
-
-    if (totalCredits === 0) return { sgpa: 0, totalCredits: 0, valid: false };
-
-    return {
-      sgpa: Math.round((totalPoints / totalCredits) * 100) / 100,
-      totalCredits,
-      valid: true,
-    };
+  function renderGradeOptions() {
+    return academic.GRADE_OPTIONS.map(
+      (g) => `<option value="${g.value}">${g.label}</option>`
+    ).join('');
   }
 
   function renderRow(index) {
@@ -46,14 +19,7 @@
         <input type="number" class="input calc-credits" placeholder="Cr" min="1" max="10" step="1" aria-label="Credits">
         <select class="input calc-grade" aria-label="Grade">
           <option value="">Grade</option>
-          <option value="O">O (10)</option>
-          <option value="A+">A+ (9)</option>
-          <option value="A">A (8)</option>
-          <option value="B+">B+ (7)</option>
-          <option value="B">B (6)</option>
-          <option value="C">C (5)</option>
-          <option value="P">P (4)</option>
-          <option value="F">F (0)</option>
+          ${renderGradeOptions()}
         </select>
         <button type="button" class="btn-icon calc-remove" aria-label="Remove subject" ${index === 0 ? 'hidden' : ''}>×</button>
       </div>`;
@@ -68,37 +34,17 @@
   }
 
   function init(containerId) {
-    const container = document.getElementById(containerId);
     const rowsContainer = document.getElementById('sgpa-rows');
     const resultEl = document.getElementById('sgpa-result');
     const addBtn = document.getElementById('sgpa-add-row');
     const calcBtn = document.getElementById('sgpa-calculate');
 
-    if (!rowsContainer) return;
+    if (!rowsContainer || !academic) return;
 
     let rowCount = 0;
 
-    function addRow() {
-      rowsContainer.insertAdjacentHTML('beforeend', renderRow(rowCount));
-      rowCount++;
-      bindRemoveButtons();
-    }
-
-    function bindRemoveButtons() {
-      rowsContainer.querySelectorAll('.calc-remove').forEach((btn) => {
-        btn.onclick = () => {
-          btn.closest('.calc-row')?.remove();
-          updateResult();
-        };
-      });
-      rowsContainer.querySelectorAll('input, select').forEach((el) => {
-        el.addEventListener('input', updateResult);
-        el.addEventListener('change', updateResult);
-      });
-    }
-
     function updateResult() {
-      const result = calculate(getSubjects(rowsContainer));
+      const result = academic.calculateSGPA(getSubjects(rowsContainer));
       if (!resultEl) return;
       if (!result.valid) {
         resultEl.innerHTML = '<span class="result-placeholder">Enter subjects to calculate SGPA</span>';
@@ -106,8 +52,22 @@
       }
       resultEl.innerHTML = `
         <div class="result-value">${result.sgpa.toFixed(2)}</div>
-        <div class="result-meta">${result.totalCredits} total credits</div>`;
+        <div class="result-meta">${result.totalCredits} total credits · ${result.subjectCount} subject${result.subjectCount === 1 ? '' : 's'}</div>`;
     }
+
+    function addRow() {
+      rowsContainer.insertAdjacentHTML('beforeend', renderRow(rowCount));
+      rowCount += 1;
+    }
+
+    rowsContainer.addEventListener('input', updateResult);
+    rowsContainer.addEventListener('change', updateResult);
+    rowsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.calc-remove');
+      if (!btn || btn.hidden) return;
+      btn.closest('.calc-row')?.remove();
+      updateResult();
+    });
 
     for (let i = 0; i < 5; i++) addRow();
 
@@ -115,5 +75,9 @@
     calcBtn?.addEventListener('click', updateResult);
   }
 
-  window.MITSSGPA = { init, calculate, GRADE_POINTS };
+  window.MITSSGPA = {
+    init,
+    calculate: academic?.calculateSGPA,
+    GRADE_POINTS: academic?.GRADE_POINTS,
+  };
 })();

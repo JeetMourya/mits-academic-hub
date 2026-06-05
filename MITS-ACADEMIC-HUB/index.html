@@ -41,7 +41,19 @@
         <a href="#lookup" class="nav-link" data-section="lookup">Results</a>
         <a href="#tools" class="nav-link" data-section="tools">Tools</a>
         <a href="#history" class="nav-link" data-section="history">History</a>
-        <a href="admin/admin.html" class="nav-link nav-link-admin">Admin</a>
+        <a href="#admin" class="nav-link nav-link-admin" data-section="admin" data-admin-only hidden>Admin</a>
+        <button type="button" id="admin-login-btn" class="btn btn-ghost btn-sm nav-admin-login" data-guest-only>Admin Login</button>
+        <div id="admin-profile" class="admin-profile" data-admin-only hidden>
+          <button type="button" id="admin-profile-toggle" class="admin-profile-btn" aria-expanded="false" aria-haspopup="true" aria-label="Admin profile menu">
+            <span id="admin-profile-avatar" class="admin-profile-avatar">A</span>
+            <span id="admin-profile-name" class="admin-profile-name">Admin</span>
+            <span class="admin-profile-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div id="admin-profile-menu" class="admin-profile-menu glass" hidden>
+            <a href="#admin" class="admin-profile-item">Semester Management</a>
+            <button type="button" id="admin-logout-btn" class="admin-profile-item admin-profile-logout">Logout</button>
+          </div>
+        </div>
         <button type="button" class="btn-theme" data-theme-toggle aria-label="Toggle theme">
           <span class="theme-icon">🌙</span>
           <span class="theme-label">Dark mode</span>
@@ -302,9 +314,8 @@
                 <div class="form-group">
                   <label for="pct-formula" class="form-label">Conversion Formula</label>
                   <select id="pct-formula" class="input">
-                    <option value="mits">MITS Formula (SGPA − 0.75) × 10</option>
-                    <option value="cbse">CBSE Formula SGPA × 9.5</option>
-                    <option value="linear">Linear SGPA × 10</option>
+                    <option value="mits">MITS Official — CGPA × 10</option>
+                    <option value="cbse">CBSE Reference — SGPA × 9.5</option>
                   </select>
                 </div>
               </div>
@@ -373,6 +384,69 @@
       </div>
     </section>
 
+    <!-- Admin (visible after login) -->
+    <section id="admin" class="section section-alt" data-admin-only hidden>
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="admin-badge">Admin Mode</span>
+          <h2 class="section-title">Semester Link Manager</h2>
+          <p class="section-desc">Add, edit, enable, or disable semester result links. Changes are saved locally and can be exported to update <code>links.json</code> for deployment.</p>
+        </div>
+
+        <div class="admin-grid">
+          <div class="glass card reveal">
+            <div class="section-header-row" style="margin-bottom: 24px;">
+              <h3 class="card-title" style="margin: 0;">Semester Links</h3>
+              <button type="button" id="add-semester-btn" class="btn btn-primary btn-sm">+ Add Semester</button>
+            </div>
+
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Session</th>
+                    <th>URL Template</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="semesters-table-body">
+                  <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside class="glass card admin-sidebar-card reveal">
+            <h3 class="card-title">Overview</h3>
+            <div class="admin-stats">
+              <div class="admin-stat">
+                <div id="stat-total" class="admin-stat-value">0</div>
+                <div class="admin-stat-label">Total Semesters</div>
+              </div>
+              <div class="admin-stat">
+                <div id="stat-active" class="admin-stat-value">0</div>
+                <div class="admin-stat-label">Active</div>
+              </div>
+            </div>
+
+            <div class="info-note" style="margin-bottom: 20px;">
+              <span>ℹ</span>
+              <p>Static sites cannot write to server files. Save changes locally, then export <code>links.json</code> and replace the file in <code>data/</code> before deploying.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <button type="button" id="save-local-btn" class="btn btn-primary btn-full">Save to Local Storage</button>
+              <button type="button" id="export-json-btn" class="btn btn-secondary btn-full">Export links.json</button>
+              <button type="button" id="reset-default-btn" class="btn btn-ghost btn-full">Reset to Default</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
     <!-- History -->
     <section id="history" class="section">
       <div class="container">
@@ -407,11 +481,11 @@
         <a href="#lookup">Results</a>
         <a href="#tools">Academic Tools</a>
         <a href="#history">History</a>
-        <a href="admin/admin.html">Admin Panel</a>
+        <a href="#admin" data-admin-only hidden>Semester Management</a>
       </div>
       <div class="footer-links">
         <h4>Project</h4>
-        <span>Version 1.0.0</span>
+        <span>Version 1.2.0</span>
         <span>Stack: HTML · CSS · JS</span>
         <span>Deploy: Vercel Ready</span>
       </div>
@@ -421,11 +495,84 @@
     </div>
   </footer>
 
+  <!-- Admin Login Modal -->
+  <div id="admin-login-modal" class="modal-overlay" hidden>
+    <div class="glass modal admin-login-modal">
+      <div class="modal-header">
+        <h2>Admin Login</h2>
+        <button type="button" id="admin-login-close" class="btn-icon" aria-label="Close">×</button>
+      </div>
+      <p class="modal-desc">Sign in to manage semester result links</p>
+      <form id="admin-login-form" class="admin-form" novalidate>
+        <div class="form-group">
+          <label for="admin-username" class="form-label">Username</label>
+          <input type="text" id="admin-username" class="input" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="admin-password" class="form-label">Password</label>
+          <input type="password" id="admin-password" class="input" autocomplete="current-password" required>
+        </div>
+        <span id="login-error" class="field-error" hidden role="alert"></span>
+        <button type="submit" id="login-submit-btn" class="btn btn-primary btn-full">
+          <span class="btn-spinner"></span>
+          <span class="btn-label">Sign In</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Semester Edit Modal -->
+  <div id="edit-modal" class="modal-overlay" hidden>
+    <div class="glass modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Add Semester</h2>
+        <button type="button" id="modal-close" class="btn-icon" aria-label="Close">×</button>
+      </div>
+      <form id="semester-form" class="admin-form">
+        <input type="hidden" id="edit-index" value="-1">
+        <div class="form-group">
+          <label for="sem-id" class="form-label">Semester ID</label>
+          <input type="number" id="sem-id" class="input" min="1" max="20" required>
+        </div>
+        <div class="form-group">
+          <label for="sem-name" class="form-label">Name</label>
+          <input type="text" id="sem-name" class="input" placeholder="Semester 4" required>
+        </div>
+        <div class="form-group">
+          <label for="sem-label" class="form-label">Display Label</label>
+          <input type="text" id="sem-label" class="input" placeholder="Sem 4 · Apr 2026">
+        </div>
+        <div class="form-group">
+          <label for="sem-session" class="form-label">Session</label>
+          <input type="text" id="sem-session" class="input" placeholder="Apr 2026">
+        </div>
+        <div class="form-group">
+          <label for="sem-url" class="form-label">URL Template</label>
+          <textarea id="sem-url" class="input" placeholder="https://iums.mitsgwalior.in/ViewSC.aspx?...{ENROLLMENT}..." required></textarea>
+          <span class="field-error" style="color: var(--text-muted); margin-top: 6px; font-size: 0.8rem;">Must include <code>{ENROLLMENT}</code> placeholder</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">
+            <input type="checkbox" id="sem-active" checked> Active (visible to students)
+          </label>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 8px;">
+          <button type="submit" class="btn btn-primary" style="flex:1;">Save Semester</button>
+          <button type="button" id="modal-cancel" class="btn btn-ghost">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/admin-auth.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/captcha.js"></script>
   <script src="js/history.js"></script>
+  <script src="js/academic.js"></script>
   <script src="js/sgpa.js"></script>
   <script src="js/cgpa.js"></script>
+  <script src="js/admin.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
