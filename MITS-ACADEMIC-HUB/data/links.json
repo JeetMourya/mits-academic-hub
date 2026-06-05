@@ -1,0 +1,33 @@
+{
+  "semesters": [
+    {
+      "id": 1,
+      "name": "Semester 1",
+      "label": "Sem 1 · Nov 2024",
+      "urlTemplate": "https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d={ENROLLMENT}&U3bJdzw70jtQ4d=1&U4bJdzw70jtQ5d=112024",
+      "session": "Nov 2024",
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Semester 2",
+      "label": "Sem 2 · Apr 2025",
+      "urlTemplate": "https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d={ENROLLMENT}&U3bJdzw70jtQ4d=2&U4bJdzw70jtQ5d=042025",
+      "session": "Apr 2025",
+      "active": true
+    },
+    {
+      "id": 3,
+      "name": "Semester 3",
+      "label": "Sem 3 · Nov 2025",
+      "urlTemplate": "https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d={ENROLLMENT}&U3bJdzw70jtQ4d=3&U4bJdzw70jtQ5d=112025",
+      "session": "Nov 2025",
+      "active": true
+    }
+  ],
+  "metadata": {
+    "institution": "MITS Gwalior",
+    "lastUpdated": "2025-06-05",
+    "version": "1.0.0"
+  }
+}
