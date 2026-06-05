@@ -1688,3 +1688,129 @@ select.input.calc-grade {
   .captcha-group { flex-direction: column; align-items: stretch; }
   #captcha-canvas { width: 100%; }
 }
+
+/* ===== MOBILE PREMIUM FIX ===== */
+
+@media (max-width: 768px) {
+
+  .container{
+    padding-left:16px;
+    padding-right:16px;
+  }
+
+  .hero{
+    padding-top:110px;
+    text-align:center;
+  }
+
+  .hero-grid{
+    display:flex;
+    flex-direction:column;
+    gap:32px;
+  }
+
+  .hero-content{
+    width:100%;
+  }
+
+  .hero-title{
+    font-size:2.2rem;
+    line-height:1.15;
+  }
+
+  .hero-subtitle{
+    font-size:0.95rem;
+    max-width:100%;
+    margin:auto;
+  }
+
+  .hero-actions{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .hero-actions .btn{
+    width:100%;
+  }
+
+  .hero-visual{
+    width:100%;
+    min-height:auto;
+  }
+
+  .hero-card{
+    width:100%;
+  }
+
+  .dashboard-grid{
+    grid-template-columns:1fr;
+    gap:20px;
+  }
+
+  .glass{
+    border-radius:20px;
+  }
+
+  .card{
+    padding:20px;
+  }
+
+  .tool-panel{
+    padding:20px;
+  }
+
+  .section{
+    padding:56px 0;
+  }
+
+  .section-title{
+    font-size:1.8rem;
+  }
+
+  .history-item{
+    padding:14px;
+  }
+
+  .admin-table{
+    font-size:12px;
+  }
+
+  .footer{
+    text-align:center;
+  }
+
+  .footer-brand{
+    flex-direction:column;
+    align-items:center;
+  }
+
+}
+
+/* Extra Small Phones */
+
+@media (max-width: 480px){
+
+  .hero-title{
+    font-size:1.9rem;
+  }
+
+  .hero-subtitle{
+    font-size:0.9rem;
+  }
+
+  .hero-stats{
+    justify-content:center;
+    gap:16px;
+  }
+
+  .stat-value{
+    font-size:1.2rem;
+  }
+
+  .result-value{
+    font-size:2rem;
+  }
+
+}
