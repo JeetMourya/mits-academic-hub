@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MITS Academic Hub — Admin Dashboard">
+  <meta name="theme-color" content="#6366f1">
+  <title>Admin Dashboard — MITS Academic Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="ambient ambient-1" aria-hidden="true"></div>
+  <div class="ambient ambient-2" aria-hidden="true"></div>
+  <div class="ambient ambient-3" aria-hidden="true"></div>
+
+  <div id="login-container" class="admin-login-page">
+    <div class="login-card">
+      <div class="login-header">
+        <h1>Admin Portal</h1>
+        <p>MITS Academic Hub</p>
+      </div>
+
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" required placeholder="admin@mitshub.com">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required placeholder="••••••••">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
+      </form>
+
+      <div id="login-error" class="error-message" style="display: none;"></div>
+    </div>
+  </div>
+
+  <div id="dashboard-container" class="admin-dashboard" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-header">
+        <a href="#" class="sidebar-brand">
+          <span class="brand-icon">M</span>
+          <span class="brand-text">MITS Hub</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="nav-item active" data-nav="dashboard">
+          <span class="icon">📊</span>
+          <span>Dashboard</span>
+        </a>
+        <a href="#semesters" class="nav-item" data-nav="semesters">
+          <span class="icon">📚</span>
+          <span>Semesters</span>
+        </a>
+        <a href="#students" class="nav-item" data-nav="students">
+          <span class="icon">👥</span>
+          <span>Students</span>
+        </a>
+        <a href="#activity" class="nav-item" data-nav="activity">
+          <span class="icon">📋</span>
+          <span>Activity</span>
+        </a>
+        <a href="#settings" class="nav-item" data-nav="settings">
+          <span class="icon">⚙️</span>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button type="button" id="logout-btn" class="btn btn-ghost btn-block">Logout</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="admin-main">
+      <!-- Header -->
+      <header class="admin-header">
+        <div class="header-title">
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+        <div class="header-actions">
+          <div class="admin-profile">
+            <span id="admin-name">Admin</span>
+            <span id="admin-avatar" class="admin-avatar">A</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <main class="admin-content">
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view active">
+          <div class="dashboard-grid">
+            <div class="stat-card">
+              <div class="stat-icon">📚</div>
+              <div class="stat-content">
+                <div class="stat-value" id="total-semesters">0</div>
+                <div class="stat-label">Active Semesters</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">👥</div>
+              <div class="stat-content">
+                <div class="stat-value" id="total-students">0</div>
+                <div class="stat-label">Total Students</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">📊</div>
+              <div class="stat-content">
+                <div class="stat-value" id="results-fetched">0</div>
+                <div class="stat-label">Results Fetched</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">🔐</div>
+              <div class="stat-content">
+                <div class="stat-value" id="last-login">Never</div>
+                <div class="stat-label">Last Login</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Recent Activity</h2>
+            </div>
+            <div class="card-body">
+              <div id="recent-activity" class="activity-list">
+                <p class="text-muted">Loading activity...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Semesters View -->
+        <div id="semesters-view" class="view">
+          <div class="card">
+            <div class="card-header">
+              <h2>Manage Semesters</h2>
+              <button type="button" id="new-semester-btn" class="btn btn-primary btn-sm">+ New Semester</button>
+            </div>
+            <div class="card-body">
+              <div id="semesters-list" class="table-responsive">
+                <p class="text-muted">Loading semesters...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Students View -->
+        <div id="students-view" class="view">
+          <div class="card">
+            <div class="card-header">
+              <h2>Students</h2>
+              <div class="search-box">
+                <input type="text" id="student-search" placeholder="Search by enrollment number...">
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="students-list" class="table-responsive">
+                <p class="text-muted">Loading students...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity View -->
+        <div id="activity-view" class="view">
+          <div class="card">
+            <div class="card-header">
+              <h2>Activity Logs</h2>
+            </div>
+            <div class="card-body">
+              <div id="activity-logs-list" class="table-responsive">
+                <p class="text-muted">Loading activity logs...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings-view" class="view">
+          <div class="card">
+            <div class="card-header">
+              <h2>Profile Settings</h2>
+            </div>
+            <div class="card-body">
+              <form id="settings-form" class="form">
+                <div class="form-group">
+                  <label for="settings-name">Full Name</label>
+                  <input type="text" id="settings-name" placeholder="Your name">
+                </div>
+
+                <div class="form-group">
+                  <label for="settings-email">Email</label>
+                  <input type="email" id="settings-email" readonly>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Modal for New Semester -->
+  <div id="semester-modal" class="modal" style="display: none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>New Semester</h2>
+        <button type="button" class="modal-close">&times;</button>
+      </div>
+      <form id="semester-form" class="form">
+        <div class="form-group">
+          <label for="sem-name">Semester Name</label>
+          <input type="text" id="sem-name" required placeholder="e.g., Semester 5">
+        </div>
+
+        <div class="form-group">
+          <label for="sem-number">Semester Number</label>
+          <input type="number" id="sem-number" required placeholder="e.g., 5">
+        </div>
+
+        <div class="form-group">
+          <label for="sem-url">Result URL</label>
+          <input type="text" id="sem-url" required placeholder="e.g., ViewSC.aspx?...">
+        </div>
+
+        <div class="form-group">
+          <label for="sem-description">Description</label>
+          <textarea id="sem-description" placeholder="Optional description"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="document.getElementById('semester-modal').style.display='none'">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Semester</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="../js/api-client.js"></script>
+  <script src="../css/admin-dashboard.js"></script>
+</body>
+</html>

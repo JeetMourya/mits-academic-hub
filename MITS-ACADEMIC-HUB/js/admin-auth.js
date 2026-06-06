@@ -1,156 +1,124 @@
 /**
- * MITS Academic Hub — Admin Authentication
- * Session-based login with inactivity timeout and brute-force protection.
+ * MITS Academic Hub - Admin Authentication
+ * Backend JWT login, verification, logout, and inactivity handling.
  */
 (function () {
   'use strict';
 
-  const SESSION_KEY = 'mits_admin_session';
-  const LOCKOUT_KEY = 'mits_admin_lockout';
+  const ACCESS_TOKEN_KEY = 'accessToken';
+  const REFRESH_TOKEN_KEY = 'refreshToken';
+  const ADMIN_PROFILE_KEY = 'adminProfile';
+  const ACTIVITY_KEY = 'adminLastActivity';
 
   function getConfig() {
     return window.MITS_CONFIG?.admin || {};
   }
 
-  function generateToken() {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  function getToken() {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
   }
 
-  function readSession() {
+  function readAdminProfile() {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(ADMIN_PROFILE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   }
 
-  function writeSession(session) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  function writeAdminProfile(admin) {
+    if (admin) localStorage.setItem(ADMIN_PROFILE_KEY, JSON.stringify(admin));
   }
 
-  function clearSession() {
-    sessionStorage.removeItem(SESSION_KEY);
+  function clearAuth() {
+    if (window.API?.clearAuth) {
+      window.API.clearAuth();
+      return;
+    }
+
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_PROFILE_KEY);
+    localStorage.removeItem(ACTIVITY_KEY);
   }
 
-  function readLockout() {
-    try {
-      const raw = localStorage.getItem(LOCKOUT_KEY);
-      return raw ? JSON.parse(raw) : { attempts: 0, lockedUntil: null };
-    } catch {
-      return { attempts: 0, lockedUntil: null };
+  function touchSession() {
+    if (getToken()) {
+      localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
     }
   }
 
-  function writeLockout(data) {
-    localStorage.setItem(LOCKOUT_KEY, JSON.stringify(data));
-  }
-
-  function isLockedOut() {
-    const lockout = readLockout();
-    if (!lockout.lockedUntil) return { locked: false, remainingMs: 0 };
-    const remaining = lockout.lockedUntil - Date.now();
-    if (remaining > 0) return { locked: true, remainingMs: remaining };
-    writeLockout({ attempts: 0, lockedUntil: null });
-    return { locked: false, remainingMs: 0 };
-  }
-
-  function formatLockoutTime(ms) {
-    const mins = Math.ceil(ms / 60000);
-    return mins <= 1 ? '1 minute' : `${mins} minutes`;
-  }
-
-  function isSessionValid(session) {
-    if (!session?.token || !session?.expiresAt) return false;
-    return Date.now() < session.expiresAt;
-  }
-
-  function isAuthenticated() {
-    const session = readSession();
-    if (!isSessionValid(session)) {
-      if (session) clearSession();
+  async function isAuthenticated() {
+    if (!getToken() || !window.API?.verifyToken) {
+      clearAuth();
       return false;
     }
 
     const { inactivityTimeoutMs = 15 * 60 * 1000 } = getConfig();
-    const inactiveMs = Date.now() - (session.lastActivity || session.createdAt || 0);
-    if (inactiveMs > inactivityTimeoutMs) {
-      clearSession();
+    const lastActivity = Number(localStorage.getItem(ACTIVITY_KEY) || 0);
+
+    if (lastActivity && Date.now() - lastActivity > inactivityTimeoutMs) {
+      clearAuth();
       return false;
     }
 
+    const verified = await window.API.verifyToken();
+
+    if (!verified.success) {
+      clearAuth();
+      return false;
+    }
+
+    writeAdminProfile(verified.data?.admin);
+    touchSession();
     return true;
   }
 
-  function touchSession() {
-    const session = readSession();
-    if (!session) return;
-    session.lastActivity = Date.now();
-    writeSession(session);
-  }
-
-  function login(username, password) {
-    const config = getConfig();
-    const lockoutCheck = isLockedOut();
-    if (lockoutCheck.locked) {
+  async function login(email, password) {
+    if (!window.API?.login || !window.API?.setTokens) {
       return {
         success: false,
-        message: `Too many failed attempts. Try again in ${formatLockoutTime(lockoutCheck.remainingMs)}.`,
+        message: 'Authentication service is unavailable.',
       };
     }
 
-    const validUser = String(username).trim() === config.username;
-    const validPass = String(password) === config.password;
+    const result = await window.API.login(email, password);
 
-    if (!validUser || !validPass) {
-      const lockout = readLockout();
-      lockout.attempts += 1;
-      const maxAttempts = config.maxLoginAttempts || 5;
+    if (!result.success) {
+      clearAuth();
+      return {
+        success: false,
+        message: result.message || 'Invalid email or password',
+      };
+    }
 
-      if (lockout.attempts >= maxAttempts) {
-        lockout.lockedUntil = Date.now() + (config.lockoutDurationMs || 15 * 60 * 1000);
-        lockout.attempts = 0;
-        writeLockout(lockout);
-        return {
-          success: false,
-          message: `Account locked for ${formatLockoutTime(config.lockoutDurationMs || 15 * 60 * 1000)} due to repeated failures.`,
-        };
+    window.API.setTokens(result.data.accessToken, result.data.refreshToken);
+    writeAdminProfile(result.data.admin);
+    touchSession();
+
+    return { success: true, message: result.message || 'Login successful' };
+  }
+
+  async function logout() {
+    if (window.API?.logout && getToken()) {
+      try {
+        await window.API.logout();
+      } catch {
+        clearAuth();
       }
-
-      writeLockout(lockout);
-      const remaining = maxAttempts - lockout.attempts;
-      return {
-        success: false,
-        message: `Invalid credentials. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
-      };
+      return;
     }
 
-    writeLockout({ attempts: 0, lockedUntil: null });
-
-    const now = Date.now();
-    writeSession({
-      token: generateToken(),
-      username: config.username,
-      createdAt: now,
-      lastActivity: now,
-      expiresAt: now + (config.sessionTimeoutMs || 30 * 60 * 1000),
-    });
-
-    return { success: true, message: 'Login successful' };
+    clearAuth();
   }
 
-  function logout() {
-    clearSession();
-  }
-
-  function requireAuth(onUnauthenticated) {
-    if (isAuthenticated()) {
+  async function requireAuth(onUnauthenticated) {
+    if (await isAuthenticated()) {
       touchSession();
       return true;
     }
+
     if (typeof onUnauthenticated === 'function') onUnauthenticated();
     return false;
   }
@@ -159,13 +127,13 @@
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
     let timer = null;
 
-    function resetTimer() {
-      if (!isAuthenticated()) return;
+    async function resetTimer() {
+      if (!(await isAuthenticated())) return;
       touchSession();
       clearTimeout(timer);
       const { inactivityTimeoutMs = 15 * 60 * 1000 } = getConfig();
-      timer = setTimeout(() => {
-        logout();
+      timer = setTimeout(async () => {
+        await logout();
         if (typeof onTimeout === 'function') onTimeout();
       }, inactivityTimeoutMs);
     }
@@ -179,9 +147,9 @@
     };
   }
 
-  function updateAdminVisibility() {
-    const show = isAuthenticated();
-    const session = readSession();
+  async function updateAdminVisibility() {
+    const show = await isAuthenticated();
+    const profile = readAdminProfile();
 
     document.querySelectorAll('[data-admin-only]').forEach((el) => {
       el.hidden = !show;
@@ -193,10 +161,19 @@
 
     const nameEl = document.getElementById('admin-profile-name');
     const avatarEl = document.getElementById('admin-profile-avatar');
-    const username = session?.username || getConfig().username || 'Admin';
+    const displayName = profile?.name || profile?.email || 'Admin';
 
-    if (nameEl) nameEl.textContent = username;
-    if (avatarEl) avatarEl.textContent = username.charAt(0).toUpperCase();
+    if (nameEl) nameEl.textContent = displayName;
+    if (avatarEl) avatarEl.textContent = displayName.charAt(0).toUpperCase();
+  }
+
+  function isLockedOut() {
+    return { locked: false, remainingMs: 0 };
+  }
+
+  function formatLockoutTime(ms) {
+    const mins = Math.ceil(ms / 60000);
+    return mins <= 1 ? '1 minute' : `${mins} minutes`;
   }
 
   window.MITSAdminAuth = {

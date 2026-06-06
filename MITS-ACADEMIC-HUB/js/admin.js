@@ -67,8 +67,8 @@
     if (toggle) toggle.setAttribute('aria-expanded', 'false');
   }
 
-  function onAdminSessionActive() {
-    window.MITSAdminAuth?.updateAdminVisibility();
+  async function onAdminSessionActive() {
+    await window.MITSAdminAuth?.updateAdminVisibility();
     if (!panelInitialized) {
       initAdminPanel();
       panelInitialized = true;
@@ -94,7 +94,7 @@
     onAdminSessionEnded();
   }
 
-  function handleLoginSubmit(e) {
+  async function handleLoginSubmit(e) {
     e.preventDefault();
     const username = document.getElementById('admin-username')?.value;
     const password = document.getElementById('admin-password')?.value;
@@ -109,7 +109,7 @@
     btn?.classList.add('loading');
     if (btn) btn.disabled = true;
 
-    const result = window.MITSAdminAuth.login(username, password);
+    const result = await window.MITSAdminAuth.login(username, password);
 
     setTimeout(() => {
       btn?.classList.remove('loading');
@@ -131,15 +131,15 @@
     }, 300);
   }
 
-  function handleLogout() {
-    window.MITSAdminAuth?.logout();
+  async function handleLogout() {
+    await window.MITSAdminAuth?.logout();
     onAdminSessionEnded();
     showToast('Logged out successfully', 'info');
   }
 
   function guardAction(fn) {
-    return (...args) => {
-      if (!window.MITSAdminAuth?.requireAuth(openLoginModal)) return;
+    return async (...args) => {
+      if (!(await window.MITSAdminAuth?.requireAuth(openLoginModal))) return;
       window.MITSAdminAuth.touchSession();
       return fn(...args);
     };
@@ -424,7 +424,7 @@
     });
   }
 
-  function init() {
+  async function init() {
     if (uiInitialized) return;
     uiInitialized = true;
 
@@ -450,10 +450,10 @@
       }
     });
 
-    if (window.MITSAdminAuth?.isAuthenticated()) {
-      onAdminSessionActive();
+    if (await window.MITSAdminAuth?.isAuthenticated()) {
+      await onAdminSessionActive();
     } else {
-      window.MITSAdminAuth?.updateAdminVisibility();
+      await window.MITSAdminAuth?.updateAdminVisibility();
       if (window.location.hash === '#admin') {
         openLoginModal();
       }

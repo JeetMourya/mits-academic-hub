@@ -181,12 +181,74 @@
     window.MITSHistory?.render('history-list', handleHistorySelect);
     updateResultActions(url);
 
-    window.open(url, '_blank', 'noopener,noreferrer');
-    showToast('Result page opened in a new tab', 'success');
+        try {
+
+      const response = await fetch('/api/results/fetch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          enrollmentNumber: enrollmentCheck.value,
+          semesterId: semesterCheck.semester.id
+        })
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        showToast(result.message || 'Result not found', 'error');
+        setLoading(false);
+        return;
+      }
+
+      const resultBox = document.getElementById('result-display');
+
+      if (resultBox) {
+        resultBox.hidden = false;
+
+        document.getElementById('student-name').textContent =
+          result.data.studentName || '';
+
+        document.getElementById('student-enrollment').textContent =
+          result.data.enrollmentNumber || '';
+
+        document.getElementById('student-semester').textContent =
+          result.data.semester || '';
+
+        document.getElementById('student-sgpa').textContent =
+          result.data.sgpa || '';
+
+        document.getElementById('student-status').textContent =
+          result.data.status || '';
+
+        const tbody = document.getElementById('subjects-body');
+
+        if (tbody) {
+          tbody.innerHTML = '';
+
+          (result.data.subjects || []).forEach(subject => {
+            tbody.innerHTML += `
+              <tr>
+                <td>${subject.code || ''}</td>
+                <td>${subject.name || ''}</td>
+                <td>${subject.grade || ''}</td>
+              </tr>
+            `;
+          });
+        }
+      }
+
+      showToast('Result Loaded Successfully', 'success');
+
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to fetch result', 'error');
+    }
+
     window.MITSCaptcha?.refresh();
     setLoading(false);
   }
-
   function handleHistorySelect({ enrollment, semesterId }) {
     const enrollmentInput = document.getElementById('enrollment-input');
     const semesterSelect = document.getElementById('semester-select');
