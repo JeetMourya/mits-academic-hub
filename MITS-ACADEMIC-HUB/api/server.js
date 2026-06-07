@@ -5,6 +5,7 @@
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
+app.set('trust proxy', 1);
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
