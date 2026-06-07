@@ -1,34 +1,17 @@
 {
   "version": 2,
-  "buildCommand": "npm install",
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret",
-    "JWT_REFRESH_SECRET": "@jwt_refresh_secret",
-    "NODE_ENV": "production",
-    "PORT": "3000",
-    "CORS_ORIGIN": "@cors_origin",
-    "IUMS_BASE_URL": "@iums_base_url",
-    "FRONTEND_URL": "@frontend_url"
-  },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/server.js"
+      "source": "/api/:path*",
+      "destination": "/api/server.js"
     },
     {
-      "src": "/admin/(.*)",
-      "dest": "/admin/index.html"
+      "source": "/admin/:path*",
+      "destination": "/admin/index.html"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/server.js": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  ]
 }
