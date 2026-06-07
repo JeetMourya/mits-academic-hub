@@ -7,7 +7,7 @@ const cheerio = require('cheerio');
 class ResultFetcher {
   constructor() {
     this.baseUrl = process.env.IUMS_BASE_URL || 'https://iums.mitsgwalior.in';
-    this.timeout = parseInt(process.env.IUMS_FETCH_TIMEOUT) || 10000;
+    this.timeout = parseInt(process.env.IUMS_FETCH_TIMEOUT) || 30000;
   }
 
   parseResultHTML(html) {
