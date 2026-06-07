@@ -80,12 +80,14 @@
         <button type="button" id="logout-btn" class="btn btn-ghost btn-block">Logout</button>
       </div>
     </aside>
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
     <!-- Main Content -->
     <div class="admin-main">
       <!-- Header -->
       <header class="admin-header">
-        <div class="header-title">
+        <div class="header-title" style="display:flex;align-items:center;gap:12px;">
+          <button type="button" id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Toggle Navigation" style="display:none;background:none;border:none;font-size:1.5rem;color:var(--text-primary);cursor:pointer;padding:4px;">☰</button>
           <h1 id="page-title">Dashboard</h1>
         </div>
         <div class="header-actions">
@@ -232,6 +234,7 @@
         <button type="button" class="modal-close">&times;</button>
       </div>
       <form id="semester-form" class="form">
+        <input type="hidden" id="edit-sem-id" value="">
         <div class="form-group">
           <label for="sem-name">Semester Name</label>
           <input type="text" id="sem-name" required placeholder="e.g., Semester 5">
@@ -257,6 +260,68 @@
           <button type="submit" class="btn btn-primary">Create Semester</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal for Student Details -->
+  <div id="student-modal" class="modal" style="display: none;">
+    <div class="modal-overlay" onclick="document.getElementById('student-modal').style.display='none'"></div>
+    <div class="modal-content modal-lg" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h2>Student Profile & History</h2>
+        <button type="button" class="modal-close" onclick="document.getElementById('student-modal').style.display='none'">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="student-edit-form" class="form">
+          <input type="hidden" id="student-edit-id">
+          <div class="grid grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="student-enrollment">Enrollment Number</label>
+              <input type="text" id="student-enrollment" readonly style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; border-radius: 4px; padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+              <label for="student-name">Full Name</label>
+              <input type="text" id="student-name" required placeholder="Student Name" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+              <label for="student-email">Email Address</label>
+              <input type="email" id="student-email" placeholder="student@example.com" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+              <label for="student-phone">Phone Number</label>
+              <input type="text" id="student-phone" placeholder="Phone Number" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+              <label for="student-dept">Department</label>
+              <input type="text" id="student-dept" placeholder="e.g. IT, CSE, ME" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 0.5rem; width: 100%;">
+            </div>
+            <div class="form-group">
+              <label for="student-sem">Current Semester</label>
+              <input type="number" id="student-sem" placeholder="Current Semester Number" style="border: 1px solid #d1d5db; border-radius: 4px; padding: 0.5rem; width: 100%;">
+            </div>
+          </div>
+          <div style="text-align: right; margin-top: 1rem;">
+            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Update Profile</button>
+          </div>
+        </form>
+
+        <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+        <h3>Fetched Semester Results</h3>
+        <div id="student-results-container" class="table-responsive" style="margin-top: 1rem;">
+          <p class="text-muted">No fetched results found.</p>
+        </div>
+
+        <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+        <h3>Search History</h3>
+        <div id="student-history-container" class="table-responsive" style="margin-top: 1rem;">
+          <p class="text-muted">No search history found.</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="text-align: right; margin-top: 1.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('student-modal').style.display='none'">Close</button>
+      </div>
     </div>
   </div>
 

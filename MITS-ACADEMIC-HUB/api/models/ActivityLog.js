@@ -34,7 +34,7 @@ const activityLogSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
     index: true,
-    expire: 2592000, // 30 days TTL
+    expires: 2592000, // 30 days TTL
   },
 });
 

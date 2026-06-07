@@ -247,6 +247,14 @@ class APIClient {
       requiresAuth: true,
     });
   }
+
+  async updateStudent(id, data) {
+    return this.request(`/students/${id}`, {
+      method: 'PUT',
+      body: data,
+      requiresAuth: true,
+    });
+  }
 }
 
 // Export singleton instance

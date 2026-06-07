@@ -14,12 +14,15 @@ router.get('/', authenticate, authorize('manage_users'), async (req, res) => {
     const skip = parseInt(req.query.skip) || 0;
     const search = req.query.search || '';
 
+    // Escape special regex characters to prevent ReDoS attacks
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     const query = search
       ? {
           $or: [
-            { enrollmentNumber: new RegExp(search, 'i') },
-            { name: new RegExp(search, 'i') },
-            { email: new RegExp(search, 'i') },
+            { enrollmentNumber: new RegExp(escapedSearch, 'i') },
+            { name: new RegExp(escapedSearch, 'i') },
+            { email: new RegExp(escapedSearch, 'i') },
           ],
         }
       : {};
@@ -93,6 +96,41 @@ router.delete('/:id', authenticate, authorize('manage_users'), async (req, res) 
     res.status(500).json({
       success: false,
       message: 'Failed to delete student',
+    });
+  }
+});
+
+// Update student profile details
+router.put('/:id', authenticate, authorize('manage_users'), async (req, res) => {
+  try {
+    const { name, email, phone, department, semester } = req.body;
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found',
+      });
+    }
+
+    if (name !== undefined) student.name = name;
+    if (email !== undefined) student.email = email;
+    if (phone !== undefined) student.phone = phone;
+    if (department !== undefined) student.department = department;
+    if (semester !== undefined) student.semester = semester;
+    student.updatedAt = Date.now();
+
+    await student.save();
+
+    res.json({
+      success: true,
+      message: 'Student profile updated successfully',
+      data: student,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update student profile',
     });
   }
 });

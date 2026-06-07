@@ -35,7 +35,7 @@ const studentSchema = new mongoose.Schema({
     fetchedAt: Date,
   }],
   searchHistory: [{
-    semesterId: mongoose.Schema.Types.ObjectId,
+    semesterId: String,
     semesterName: String,
     fetchedAt: {
       type: Date,

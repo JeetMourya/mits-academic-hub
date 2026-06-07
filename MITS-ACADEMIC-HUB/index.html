@@ -188,42 +188,90 @@
               </button>
             </form>
 
-            <div id="result-actions" class="result-actions" hidden>
-              <p class="result-actions-label">Quick actions for your result link</p>
-              <a id="link-preview" class="link-preview" href="#" target="_blank" rel="noopener noreferrer"></a>
-              <div class="result-actions-btns">
-                <button type="button" id="copy-link-btn" class="btn btn-ghost">
-                  <span>📋</span> Copy Link
-                </button>
-                <button type="button" id="share-link-btn" class="btn btn-ghost">
-                  <span>🔗</span> Share
-                </button>
-                <button type="button" id="download-shortcut-btn" class="btn btn-ghost">
-                  <span>⬇</span> Download Shortcut
-                </button>
+          </div>
+
+          <div id="result-display" class="glass card reveal" style="grid-column: 1 / -1; max-width: 900px; margin: 0 auto; width: 100%; padding: 2.5rem;" hidden>
+            <!-- College Header -->
+            <div class="college-transcript-header" style="text-align: center; border-bottom: 2px double var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem;">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+                <div style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2)); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 1.3rem; box-shadow: 0 4px 12px var(--accent-glow);">M</div>
+                <h3 style="font-family: var(--font-sans); font-size: 1.4rem; font-weight: 700; color: var(--text-primary); letter-spacing: 0.5px; margin: 0;">MADHAV INSTITUTE OF TECHNOLOGY & SCIENCE, GWALIOR</h3>
+              </div>
+              <p style="font-family: var(--font-serif); font-style: italic; font-size: 1.1rem; color: var(--text-secondary); margin: 0;">(A Govt. Aided UGC Autonomous & NAAC Accredited Institute Affiliated to RGPV, Bhopal)</p>
+              <h4 style="font-family: var(--font-sans); font-size: 1.05rem; font-weight: 600; text-transform: uppercase; color: var(--accent); letter-spacing: 1px; margin-top: 10px; margin-bottom: 0;">Online Statement of Grades</h4>
+            </div>
+
+            <!-- Student Profile Grid -->
+            <div class="student-profile-info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; background: rgba(99, 102, 241, 0.04); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 2rem;">
+              <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Student Name</span>
+                <strong id="student-name" style="font-size: 1.1rem; color: var(--text-primary);">N/A</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Enrollment Number</span>
+                <strong id="student-enrollment" style="font-size: 1.1rem; color: var(--text-primary);">N/A</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Course / Programme</span>
+                <strong id="student-programme" style="font-size: 1.1rem; color: var(--text-primary);">Bachelor of Technology (B.Tech)</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Semester / Session</span>
+                <strong id="student-semester" style="font-size: 1.1rem; color: var(--text-primary);">N/A</strong>
               </div>
             </div>
-          </div><div id="result-display" class="glass card" hidden>
-  <h3>Student Result</h3>
 
-  <p><strong>Name:</strong> <span id="student-name"></span></p>
-  <p><strong>Enrollment:</strong> <span id="student-enrollment"></span></p>
-  <p><strong>Semester:</strong> <span id="student-semester"></span></p>
-  <p><strong>SGPA:</strong> <span id="student-sgpa"></span></p>
-  <p><strong>Status:</strong> <span id="student-status"></span></p>
+            <!-- Grades Table -->
+            <div class="admin-table-wrap" style="border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 2rem; background: var(--bg-glass);">
+              <table class="admin-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                  <tr style="background: rgba(99, 102, 241, 0.08); border-bottom: 1px solid var(--border);">
+                    <th style="padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Subject Code</th>
+                    <th style="padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Subject Name</th>
+                    <th style="padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; text-align: center;">Letter Grade</th>
+                    <th style="padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; text-align: center;">Grade Point (GP)</th>
+                  </tr>
+                </thead>
+                <tbody id="subjects-body">
+                </tbody>
+              </table>
+            </div>
 
-  <table border="1" width="100%">
-    <thead>
-      <tr>
-        <th>Code</th>
-        <th>Subject</th>
-        <th>Grade</th>
-      </tr>
-    </thead>
-    <tbody id="subjects-body">
-    </tbody>
-  </table>
-</div>
+            <!-- Summary Section -->
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1.5rem; background: rgba(99, 102, 241, 0.04); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 2rem;">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="text-align: center; background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2)); padding: 0.75rem 1.5rem; border-radius: var(--radius-md); color: white; box-shadow: 0 4px 14px var(--accent-glow);">
+                  <span style="font-size: 0.7rem; text-transform: uppercase; display: block; font-weight: 600; opacity: 0.9;">Semester SGPA</span>
+                  <strong id="student-sgpa" style="font-size: 1.6rem; font-weight: 800; display: block; margin-top: 2px;">0.00</strong>
+                </div>
+                <div>
+                  <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block;">Result Status</span>
+                  <span id="student-status-badge" style="display: inline-block; margin-top: 4px; padding: 0.25rem 0.75rem; border-radius: var(--radius-full); font-size: 0.85rem; font-weight: 700;">PASS</span>
+                </div>
+              </div>
+              
+              <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; max-width: 320px;">
+                * This is an online generated statement of grades fetched directly from the institution's database. Keep this secure.
+              </div>
+            </div>
+
+            <!-- Page Actions (Print / Reset) -->
+            <div class="result-print-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button type="button" id="result-back-btn" class="btn btn-ghost" style="padding: 10px 20px;">
+                ← Search Another
+              </button>
+              <button type="button" id="print-transcript-btn" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
+                <span>🖨️</span> Print Grade Sheet
+              </button>
+            </div>
+          </div>
+
+          <div id="result-error" class="glass card reveal" style="border-left: 4px solid var(--accent-red, #ef4444);" hidden>
+            <h3 class="card-title" style="color: var(--accent-red, #ef4444); display: flex; align-items: center; gap: 8px;">
+              <span>⚠️</span> Result Fetch Failed
+            </h3>
+            <p id="result-error-message" style="margin-bottom: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-secondary);"></p>
+          </div>
 
           <div class="glass card info-card reveal">
             <h3 class="card-title">How it works</h3>

@@ -13,6 +13,27 @@
   /* ── Data Loading ── */
 
   async function loadSemesters() {
+    // 1. Try fetching from MongoDB API first
+    try {
+      const res = await fetch('/api/results/semesters');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data?.length) {
+          semesters = json.data.map(s => ({
+            id: s.semesterNumber || s.id,
+            name: s.name,
+            label: s.name + (s.description ? ` · ${s.description}` : ''),
+            urlTemplate: s.resultUrl || s.urlTemplate,
+            active: true
+          }));
+          return semesters;
+        }
+      }
+    } catch (dbErr) {
+      console.warn('Could not fetch semesters from DB api, falling back to local storage/json:', dbErr.message);
+    }
+
+    // 2. Fallback to localStorage override
     try {
       const override = localStorage.getItem(LINKS_STORAGE_KEY);
       if (override) {
@@ -26,6 +47,7 @@
       /* fall through to fetch */
     }
 
+    // 3. Fallback to static links.json
     try {
       const res = await fetch('data/links.json');
       if (!res.ok) throw new Error('Failed to load semester links');
@@ -56,8 +78,17 @@
   /* ── Validation ── */
 
   function validateEnrollment(value) {
-    const trimmed = String(value).trim();
+    let trimmed = String(value).trim().toUpperCase();
     if (!trimmed) return { valid: false, message: 'Enrollment number is required' };
+    
+    // Auto-normalize: If B.Tech enrollment format has '0' at index 6, correct to 'O'
+    if (/^BT[A-Z]{2}\d{2}[0O]\d{4}$/.test(trimmed)) {
+      if (trimmed.charAt(6) === '0') {
+        trimmed = trimmed.substring(0, 6) + 'O' + trimmed.substring(7);
+        showToast('Auto-corrected "0" to "O" for B.Tech enrollment', 'info');
+      }
+    }
+
     if (!ENROLLMENT_PATTERN.test(trimmed)) {
       return { valid: false, message: 'Enter a valid enrollment number (8–14 alphanumeric characters)' };
     }
@@ -127,15 +158,22 @@
     });
   }
 
-  function updateResultActions(url) {
-    lastGeneratedUrl = url;
-    const actions = document.getElementById('result-actions');
-    const linkPreview = document.getElementById('link-preview');
-    if (actions) actions.hidden = !url;
-    if (linkPreview) {
-      linkPreview.textContent = url;
-      linkPreview.href = url;
-    }
+  function getGradePoint(grade) {
+    const g = String(grade).trim().toUpperCase();
+    const mapping = {
+      'A+': '10.0',
+      'A': '9.0',
+      'B+': '8.0',
+      'B': '7.0',
+      'C+': '6.0',
+      'C': '5.0',
+      'D': '4.0',
+      'F': '0.0',
+      'FAIL': '0.0',
+      'ABSENT': '0.0',
+      'ABS': '0.0'
+    };
+    return mapping[g] || '0.0';
   }
 
   /* ── Actions ── */
@@ -169,8 +207,6 @@
     const url = buildUrl(semesterCheck.semester, enrollmentCheck.value);
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 600));
-
     window.MITSHistory?.add({
       enrollment: enrollmentCheck.value,
       semesterId: semesterCheck.semester.id,
@@ -179,75 +215,114 @@
     });
 
     window.MITSHistory?.render('history-list', handleHistorySelect);
-    updateResultActions(url);
 
-        try {
-
+    try {
       const response = await fetch('/api/results/fetch', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           enrollmentNumber: enrollmentCheck.value,
-          semesterId: semesterCheck.semester.id
-        })
+          semesterId: semesterCheck.semester.id,
+        }),
       });
 
       const result = await response.json();
+      const resultBox = document.getElementById('result-display');
+      const errorBox = document.getElementById('result-error');
+      const errorMessageEl = document.getElementById('result-error-message');
 
       if (!result.success) {
-        showToast(result.message || 'Result not found', 'error');
+        if (resultBox) resultBox.hidden = true;
+        if (errorBox) {
+          errorBox.hidden = false;
+          if (errorMessageEl) errorMessageEl.textContent = result.message || 'Could not fetch your result. Please try again.';
+          errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        showToast(result.message || 'Failed to fetch result', 'error');
         setLoading(false);
+        window.MITSCaptcha?.refresh();
         return;
       }
 
-      const resultBox = document.getElementById('result-display');
+      const data = result.data;
 
-      if (resultBox) {
+      // Check if we have actual scraped data (student name or subjects)
+      const hasScrapedData = data.studentName || (data.subjects && data.subjects.length > 0);
+
+      if (hasScrapedData && resultBox) {
+        if (errorBox) errorBox.hidden = true;
         resultBox.hidden = false;
+        resultBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        document.getElementById('student-name').textContent =
-          result.data.studentName || '';
+        const nameEl = document.getElementById('student-name');
+        const enrollEl = document.getElementById('student-enrollment');
+        const semEl = document.getElementById('student-semester');
+        const sgpaEl = document.getElementById('student-sgpa');
+        const statusBadge = document.getElementById('student-status-badge');
 
-        document.getElementById('student-enrollment').textContent =
-          result.data.enrollmentNumber || '';
-
-        document.getElementById('student-semester').textContent =
-          result.data.semester || '';
-
-        document.getElementById('student-sgpa').textContent =
-          result.data.sgpa || '';
-
-        document.getElementById('student-status').textContent =
-          result.data.status || '';
+        if (nameEl) nameEl.textContent = data.studentName || 'N/A';
+        if (enrollEl) enrollEl.textContent = data.enrollmentNumber || enrollmentCheck.value;
+        if (semEl) semEl.textContent = `Semester ${data.semester} (${semesterCheck.semester.name || ''})`;
+        if (sgpaEl) sgpaEl.textContent = data.sgpa != null ? Number(data.sgpa).toFixed(2) : 'N/A';
+        
+        if (statusBadge) {
+          const statusText = String(data.status || 'PASS').toUpperCase();
+          statusBadge.textContent = statusText;
+          if (statusText === 'PASS') {
+            statusBadge.style.background = 'var(--success-soft)';
+            statusBadge.style.color = 'var(--success)';
+          } else {
+            statusBadge.style.background = 'var(--error-soft)';
+            statusBadge.style.color = 'var(--error)';
+          }
+        }
 
         const tbody = document.getElementById('subjects-body');
-
         if (tbody) {
           tbody.innerHTML = '';
-
-          (result.data.subjects || []).forEach(subject => {
-            tbody.innerHTML += `
-              <tr>
-                <td>${subject.code || ''}</td>
-                <td>${subject.name || ''}</td>
-                <td>${subject.grade || ''}</td>
-              </tr>
+          (data.subjects || []).forEach((subject) => {
+            const gp = getGradePoint(subject.grade);
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border)';
+            tr.innerHTML = `
+              <td style="padding: 1rem; color: var(--text-primary); font-weight: 500;">${subject.code || ''}</td>
+              <td style="padding: 1rem; color: var(--text-secondary);">${subject.name || ''}</td>
+              <td style="padding: 1rem; text-align: center;">
+                <span class="grade-badge" style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.85rem; background: ${subject.grade === 'F' || subject.grade === 'FAIL' ? 'var(--error-soft)' : 'var(--accent-soft)'}; color: ${subject.grade === 'F' || subject.grade === 'FAIL' ? 'var(--error)' : 'var(--accent)'};">${subject.grade || ''}</span>
+              </td>
+              <td style="padding: 1rem; text-align: center; color: var(--text-primary); font-weight: 600;">${gp}</td>
             `;
+            tbody.appendChild(tr);
           });
         }
+
+        showToast('Result loaded successfully!', 'success');
+      } else {
+        if (resultBox) resultBox.hidden = true;
+        if (errorBox) {
+          errorBox.hidden = false;
+          if (errorMessageEl) errorMessageEl.textContent = 'No result data returned. Please verify your details.';
+          errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        showToast('No result data found', 'error');
       }
-
-      showToast('Result Loaded Successfully', 'success');
-
     } catch (err) {
-      console.error(err);
-      showToast('Failed to fetch result', 'error');
+      console.error('Fetch error:', err);
+      const resultBox = document.getElementById('result-display');
+      const errorBox = document.getElementById('result-error');
+      const errorMessageEl = document.getElementById('result-error-message');
+      
+      if (resultBox) resultBox.hidden = true;
+      if (errorBox) {
+        errorBox.hidden = false;
+        if (errorMessageEl) errorMessageEl.textContent = 'A network or server error occurred. Please try again.';
+        errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      showToast('Connection error', 'error');
     }
 
-    window.MITSCaptcha?.refresh();
     setLoading(false);
+    window.MITSCaptcha?.refresh();
   }
   function handleHistorySelect({ enrollment, semesterId }) {
     const enrollmentInput = document.getElementById('enrollment-input');
@@ -420,10 +495,20 @@
     window.MITSHistory?.render('history-list', handleHistorySelect);
 
     document.getElementById('lookup-form')?.addEventListener('submit', handleSubmit);
-    document.getElementById('copy-link-btn')?.addEventListener('click', copyLink);
-    document.getElementById('share-link-btn')?.addEventListener('click', shareLink);
-    document.getElementById('download-shortcut-btn')?.addEventListener('click', downloadShortcut);
     document.getElementById('clear-history-btn')?.addEventListener('click', clearHistory);
+    
+    document.getElementById('print-transcript-btn')?.addEventListener('click', () => {
+      window.print();
+    });
+
+    document.getElementById('result-back-btn')?.addEventListener('click', () => {
+      const resultBox = document.getElementById('result-display');
+      if (resultBox) resultBox.hidden = true;
+      const lookupForm = document.getElementById('lookup-form');
+      if (lookupForm) lookupForm.reset();
+      window.MITSCaptcha?.refresh();
+      document.getElementById('lookup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
     document.getElementById('enrollment-input')?.addEventListener('input', (e) => {
       e.target.value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();

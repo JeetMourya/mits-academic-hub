@@ -48,18 +48,17 @@
   }
 
   function toggleTheme() {
-    const current = getStoredTheme() || 'system';
-    const resolved = current === 'system' ? getSystemTheme() : current;
-    setTheme(resolved === 'dark' ? 'light' : 'dark');
+    const current = getStoredTheme() || 'dark';
+    setTheme(current === 'dark' ? 'light' : 'dark');
   }
 
   function init() {
-    const stored = getStoredTheme() || 'system';
+    const stored = getStoredTheme() || 'dark';
     applyTheme(stored);
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if ((getStoredTheme() || 'system') === 'system') {
-        applyTheme('system');
+      if (!getStoredTheme()) {
+        applyTheme('dark');
       }
     });
 
@@ -70,3 +69,4 @@
 
   window.MITSTheme = { init, setTheme, toggleTheme, getStoredTheme };
 })();
+

@@ -10,89 +10,91 @@ class ResultFetcher {
     this.timeout = parseInt(process.env.IUMS_FETCH_TIMEOUT) || 10000;
   }
 
-  /**
-   * Parse IUMS result page HTML
-   */
   parseResultHTML(html) {
-    try {
-      const $ = cheerio.load(html);
-      
-      const result = {
-        studentName: '',
-        enrollmentNumber: '',
-        semester: 0,
-        sgpa: 0,
-        status: 'Pass',
-        subjects: [],
-      };
+    const $ = cheerio.load(html);
 
-      // Extract student info (adjust selectors based on actual IUMS HTML structure)
-      result.studentName = $('td:contains("Name")')?.next?.()?.text?.() || '';
-      result.enrollmentNumber = $('td:contains("Roll")')?.next?.()?.text?.() || '';
-      result.semester = parseInt($('td:contains("Semester")')?.next?.()?.text?.()) || 0;
-      result.sgpa = parseFloat($('td:contains("SGPA")')?.next?.()?.text?.()) || 0;
+    // Clean status and SGPA text
+    let rawStatus = $('[id^="rptCustomers_lbloverallresult_"]').first().text().trim();
+    let status = rawStatus.replace(/Result\s*:\s*/i, '').trim();
 
-      // Parse subject table
-      const subjectRows = $('table tr').slice(1);
-      
-      subjectRows.each((i, row) => {
-        const cells = $(row).find('td');
-        if (cells.length >= 4) {
+    let rawSgpa = $('[id^="rptCustomers_lbltotalobtmarks_"]').first().text().trim();
+    let sgpa = parseFloat(rawSgpa) || 0;
+
+    const result = {
+      studentName: $('#lblStudentName').text().trim(),
+      enrollmentNumber: $('#lblEnrollment').text().trim(),
+      semester: 1,
+      sgpa,
+      status,
+      subjects: []
+    };
+
+    // Find the semester text if present
+    const semText = $('[id^="rptCustomers_lblSemester_"]').first().text().trim();
+    if (semText) {
+      const match = semText.match(/(\d+)/);
+      if (match) {
+        result.semester = parseInt(match[1], 10);
+      }
+    }
+
+    // Parse subjects robustly by iterating over all paper code elements
+    $('[id^="rptCustomers_rptOrders_"]').filter((i, el) => {
+      return $(el).attr('id').includes('lblpaper_code_');
+    }).each((i, el) => {
+      const id = $(el).attr('id');
+      const match = id.match(/rptCustomers_rptOrders_(\d+)_lblpaper_code_(\d+)/);
+      if (match) {
+        const orderIndex = match[1];
+        const paperIndex = match[2];
+        
+        const code = $(el).text().trim();
+        const name = $(`#rptCustomers_rptOrders_${orderIndex}_lblpaper_name_${paperIndex}`).text().trim();
+        const grade = $(`#rptCustomers_rptOrders_${orderIndex}_lblobt_marks_${paperIndex}`).text().trim();
+
+        if (code) {
           result.subjects.push({
-            code: $(cells[0]).text?.().trim() || '',
-            name: $(cells[1]).text?.().trim() || '',
-            grade: $(cells[3]).text?.().trim() || '',
-            credits: parseFloat($(cells[2]).text?.()) || 0,
-            gpa: this.gradeToGPA($(cells[3]).text?.().trim()),
+            code,
+            name,
+            grade
           });
         }
-      });
+      }
+    });
 
-      result.status = result.subjects.every(s => !['F', 'AB'].includes(s.grade)) ? 'Pass' : 'Fail';
-
-      return result;
-    } catch (error) {
-      console.error('Parse error:', error);
-      throw new Error('Failed to parse result HTML');
-    }
+    return result;
   }
 
   /**
-   * Convert grade to GPA
+   * Fetch results from a full URL (used by the new results route)
    */
-  gradeToGPA(grade) {
-    const gradeMap = {
-      'A+': 4.0, 'A': 3.7, 'A-': 3.3,
-      'B+': 3.0, 'B': 2.7, 'B-': 2.3,
-      'C+': 2.0, 'C': 1.7, 'C-': 1.3,
-      'D': 1.0, 'F': 0.0, 'AB': 0.0,
-    };
-    return gradeMap[grade?.toUpperCase()] || 0;
-  }
-
-  /**
-   * Fetch results from IUMS
-   */
-  async fetchResults(enrollmentNumber, semesterUrl) {
+  async fetchFromUrl(url) {
     try {
-      const url = `${this.baseUrl}/${semesterUrl}`.replace('{ENROLLMENT}', enrollmentNumber);
-
       const response = await axios.get(url, {
         timeout: this.timeout,
         headers: {
-          'User-Agent': 'MITS-Academic-Hub/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
+        maxRedirects: 5,
       });
 
-      if (!response.data) {
-        throw new Error('Empty response from IUMS');
+      if (!response.data || typeof response.data !== 'string') {
+        return {
+          success: false,
+          error: 'Empty response from IUMS',
+          code: 'EMPTY_RESPONSE',
+        };
       }
 
       const parsedResult = this.parseResultHTML(response.data);
 
-      // Validate result
-      if (!parsedResult.studentName || !parsedResult.enrollmentNumber) {
-        throw new Error('Could not extract student information from result');
+      // Check if result is valid (has student name or subjects)
+      if (!parsedResult.studentName && parsedResult.subjects.length === 0) {
+        return {
+          success: false,
+          error: 'No result found for this enrollment number',
+          code: 'NOT_FOUND',
+        };
       }
 
       return {
@@ -102,29 +104,26 @@ class ResultFetcher {
       };
     } catch (error) {
       console.error('Fetch error:', error.message);
-      
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          error: 'Results not found for this enrollment number',
-          code: 'NOT_FOUND',
-        };
-      }
-
-      if (error.code === 'ECONNABORTED') {
-        return {
-          success: false,
-          error: 'Request timeout. IUMS server is taking too long to respond.',
-          code: 'TIMEOUT',
-        };
-      }
 
       return {
         success: false,
-        error: 'Failed to fetch results. Please try again later.',
+        error: error.code === 'ECONNABORTED'
+          ? 'IUMS server is taking too long to respond'
+          : `Could not reach IUMS: ${error.message}`,
         code: 'FETCH_ERROR',
       };
     }
+  }
+
+  /**
+   * Legacy method - fetch results using base URL + semester path
+   */
+  async fetchResults(enrollmentNumber, semesterUrl) {
+    const url = `${this.baseUrl}/${semesterUrl}`.replace(
+      '{ENROLLMENT}',
+      enrollmentNumber
+    );
+    return this.fetchFromUrl(url);
   }
 }
 

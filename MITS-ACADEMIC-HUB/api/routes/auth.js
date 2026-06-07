@@ -69,6 +69,22 @@ router.post('/login', async (req, res) => {
     // Find admin
     const admin = await Admin.findOne({ email }).select('+password');
 
+    // Check if account is locked BEFORE password comparison
+    if (admin && admin.isLocked()) {
+      await logActivity(
+        'admin_login',
+        admin._id,
+        email,
+        { reason: 'Account locked' },
+        'failure',
+        req
+      );
+      return res.status(403).json({
+        success: false,
+        message: 'Account is temporarily locked. Try again later.',
+      });
+    }
+
     if (!admin || !(await admin.comparePassword(password))) {
       await logActivity(
         'admin_login',
@@ -85,14 +101,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
-      });
-    }
-
-    // Check if account is locked
-    if (admin.isLocked()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Account is temporarily locked. Try again later.',
       });
     }
 

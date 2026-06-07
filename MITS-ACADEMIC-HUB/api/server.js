@@ -13,6 +13,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const { seedDefaultAdmin } = require('./utils/seedAdmin');
+const { seedDefaultSemesters } = require('./utils/seedSemesters');
 
 const app = express();
 
@@ -146,13 +147,12 @@ app.use((err, req, res, next) => {
 async function connectDB() {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000,
     });
 
     console.log(`✓ MongoDB connected: ${conn.connection.host}`);
     await seedDefaultAdmin();
+    await seedDefaultSemesters();
     return conn;
   } catch (err) {
     console.warn('⚠ MongoDB connection failed:', err.message);

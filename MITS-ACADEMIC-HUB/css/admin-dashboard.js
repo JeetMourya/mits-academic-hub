@@ -100,8 +100,24 @@
       const semRes = await API.getAdminSemesters();
       if (semRes.success) {
         currentSemesters = semRes.data;
-        document.getElementById('total-semesters').textContent = 
-          currentSemesters.filter(s => s.isActive).length;
+        const activeSems = currentSemesters.filter(s => s.isActive);
+        document.getElementById('total-semesters').textContent = activeSems.length;
+        
+        // Calculate total results fetched from all semesters
+        const totalResults = currentSemesters.reduce((sum, s) => sum + (s.resultsFetched || 0), 0);
+        const resultsFetchedEl = document.getElementById('results-fetched');
+        if (resultsFetchedEl) resultsFetchedEl.textContent = totalResults;
+      }
+
+      // Load students count
+      try {
+        const studentRes = await API.getStudents(1, 0, '');
+        if (studentRes.success) {
+          const totalStudentsEl = document.getElementById('total-students');
+          if (totalStudentsEl) totalStudentsEl.textContent = studentRes.data.pagination.total;
+        }
+      } catch {
+        // Students endpoint may fail, ignore
       }
 
       // Load activity
@@ -318,12 +334,33 @@
   // ========================================================================
 
   function attachDashboardListeners() {
+    // Mobile Sidebar Toggle
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('.admin-sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    if (sidebarToggle && sidebar && sidebarOverlay) {
+      sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+        sidebarOverlay.classList.toggle('open');
+      });
+
+      sidebarOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('open');
+      });
+    }
+
     // Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const view = item.dataset.nav;
         showView(view);
+
+        // Close sidebar on mobile
+        sidebar?.classList.remove('open');
+        sidebarOverlay?.classList.remove('open');
 
         if (view === 'semesters') loadSemesters();
         if (view === 'students') loadStudents();
@@ -341,6 +378,14 @@
 
     // New Semester
     document.getElementById('new-semester-btn')?.addEventListener('click', () => {
+      document.getElementById('semester-form').reset();
+      document.getElementById('edit-sem-id').value = '';
+      
+      const modalHeader = document.querySelector('#semester-modal .modal-header h2');
+      if (modalHeader) modalHeader.textContent = 'New Semester';
+      const submitBtn = document.querySelector('#semester-form button[type="submit"]');
+      if (submitBtn) submitBtn.textContent = 'Create Semester';
+      
       document.getElementById('semester-modal').style.display = 'flex';
     });
 
@@ -348,6 +393,7 @@
     document.getElementById('semester-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      const editId = document.getElementById('edit-sem-id').value;
       const data = {
         name: document.getElementById('sem-name').value,
         semesterNumber: parseInt(document.getElementById('sem-number').value),
@@ -355,14 +401,21 @@
         description: document.getElementById('sem-description').value,
       };
 
-      const res = await API.createSemester(data);
+      let res;
+      if (editId) {
+        res = await API.updateSemester(editId, data);
+      } else {
+        res = await API.createSemester(data);
+      }
+
       if (res.success) {
-        showToast('Semester created successfully', 'success');
+        showToast(editId ? 'Semester updated successfully' : 'Semester created successfully', 'success');
         document.getElementById('semester-modal').style.display = 'none';
         document.getElementById('semester-form').reset();
+        document.getElementById('edit-sem-id').value = '';
         loadSemesters();
       } else {
-        showToast(res.message || 'Failed to create semester', 'error');
+        showToast(res.message || (editId ? 'Failed to update semester' : 'Failed to create semester'), 'error');
       }
     });
 
@@ -380,6 +433,29 @@
         currentAdmin = { ...currentAdmin, ...data };
       } else {
         showToast(res.message || 'Failed to update profile', 'error');
+      }
+    });
+
+    // Student Edit Form
+    document.getElementById('student-edit-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const id = document.getElementById('student-edit-id').value;
+      const data = {
+        name: document.getElementById('student-name').value,
+        email: document.getElementById('student-email').value,
+        phone: document.getElementById('student-phone').value,
+        department: document.getElementById('student-dept').value,
+        semester: parseInt(document.getElementById('student-sem').value) || undefined,
+      };
+
+      const res = await API.updateStudent(id, data);
+      if (res.success) {
+        showToast('Student profile updated successfully', 'success');
+        document.getElementById('student-modal').style.display = 'none';
+        loadStudents(document.getElementById('student-search')?.value || '');
+      } else {
+        showToast(res.message || 'Failed to update student profile', 'error');
       }
     });
 
@@ -463,9 +539,125 @@
     }
   }
 
-  function viewStudent(id) {
-    // TODO: Implement view student details
-    showToast('View functionality coming soon', 'info');
+  async function viewStudent(id) {
+    const summary = currentStudents.find(s => s._id === id);
+    if (!summary) {
+      showToast('Student not found in list', 'error');
+      return;
+    }
+
+    showToast('Loading student details...', 'info');
+    const res = await API.getStudent(summary.enrollmentNumber);
+    if (!res.success) {
+      showToast('Failed to load student details', 'error');
+      return;
+    }
+
+    const student = res.data;
+
+    // Populate edit form
+    document.getElementById('student-edit-id').value = student._id;
+    document.getElementById('student-enrollment').value = student.enrollmentNumber;
+    document.getElementById('student-name').value = student.name || '';
+    document.getElementById('student-email').value = student.email || '';
+    document.getElementById('student-phone').value = student.phone || '';
+    document.getElementById('student-dept').value = student.department || '';
+    document.getElementById('student-sem').value = student.semester || '';
+
+    // Render results
+    renderStudentResults(student.results);
+
+    // Render history
+    renderStudentHistory(student.searchHistory);
+
+    document.getElementById('student-modal').style.display = 'flex';
+  }
+
+  function renderStudentResults(results) {
+    const container = document.getElementById('student-results-container');
+    if (!results || results.length === 0) {
+      container.innerHTML = '<p class="text-muted">No fetched results found.</p>';
+      return;
+    }
+
+    container.innerHTML = results.map(res => `
+      <div style="margin-bottom: 1.5rem; border: 1px solid #e5e7eb; border-radius: 6px; padding: 1rem; background-color: rgba(255, 255, 255, 0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+          <strong style="font-size: 1.1rem; color: #4f46e5;">Semester ${res.semesterNumber}</strong>
+          <span style="background-color: #d1fae5; color: #065f46; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600; font-size: 0.9rem;">SGPA: ${res.sgpa || 'N/A'}</span>
+        </div>
+        <table class="table" style="font-size: 0.9rem; width: 100%;">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Subject</th>
+              <th>Grade</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${res.subjects.map(sub => `
+              <tr>
+                <td>${sub.code}</td>
+                <td>${sub.name}</td>
+                <td><span style="font-weight: bold; color: #4f46e5;">${sub.grade}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="font-size: 0.8rem; color: #9ca3af; margin-top: 0.5rem; text-align: right;">
+          Fetched at: ${new Date(res.fetchedAt).toLocaleString()}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderStudentHistory(history) {
+    const container = document.getElementById('student-history-container');
+    if (!history || history.length === 0) {
+      container.innerHTML = '<p class="text-muted">No search history found.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="table" style="width: 100%;">
+        <thead>
+          <tr>
+            <th>Semester</th>
+            <th>Searched Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${history.map(item => `
+            <tr>
+              <td>Semester ${item.semesterId}</td>
+              <td>${new Date(item.fetchedAt).toLocaleString()}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function editSemester(id) {
+    const sem = currentSemesters.find(s => s._id === id);
+    if (!sem) {
+      showToast('Semester not found', 'error');
+      return;
+    }
+
+    document.getElementById('edit-sem-id').value = sem._id;
+    document.getElementById('sem-name').value = sem.name || '';
+    document.getElementById('sem-number').value = sem.semesterNumber || '';
+    document.getElementById('sem-url').value = sem.resultUrl || '';
+    document.getElementById('sem-description').value = sem.description || '';
+
+    // Update modal headers & button
+    const modalHeader = document.querySelector('#semester-modal .modal-header h2');
+    if (modalHeader) modalHeader.textContent = 'Edit Semester';
+    const submitBtn = document.querySelector('#semester-form button[type="submit"]');
+    if (submitBtn) submitBtn.textContent = 'Save Changes';
+
+    document.getElementById('semester-modal').style.display = 'flex';
   }
 
   // ========================================================================
@@ -479,5 +671,5 @@
   window.deleteSemester = deleteSemester;
   window.deleteStudent = deleteStudent;
   window.viewStudent = viewStudent;
-  window.editSemester = (id) => showToast('Edit functionality coming soon', 'info');
+  window.editSemester = editSemester;
 })();

@@ -102,7 +102,7 @@ router.post('/semesters', authenticate, authorize('manage_semesters'), async (re
       name,
       semesterNumber,
       resultUrl,
-      urlTemplate: '{ENROLLMENT}',
+      urlTemplate: resultUrl,
       description,
       startDate,
       endDate,
@@ -139,7 +139,7 @@ router.put('/semesters/:id', authenticate, authorize('manage_semesters'), async 
 
     const semester = await Semester.findByIdAndUpdate(
       req.params.id,
-      { name, resultUrl, description, isActive, startDate, endDate, updatedAt: new Date() },
+      { name, resultUrl, urlTemplate: resultUrl, description, isActive, startDate, endDate, updatedAt: new Date() },
       { new: true }
     );
 
