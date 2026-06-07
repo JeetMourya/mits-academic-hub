@@ -5,7 +5,6 @@
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
-app.set('trust proxy', 1);
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -17,6 +16,7 @@ const { seedDefaultAdmin } = require('./utils/seedAdmin');
 const { seedDefaultSemesters } = require('./utils/seedSemesters');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ============================================================================
 // SECURITY MIDDLEWARE
