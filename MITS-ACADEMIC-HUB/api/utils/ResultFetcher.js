@@ -70,6 +70,7 @@ class ResultFetcher {
    */
   async fetchFromUrl(url) {
     try {
+      console.log('Fetching URL:', url);
       const response = await axios.get(url, {
         timeout: this.timeout,
         headers: {
@@ -103,7 +104,20 @@ class ResultFetcher {
         fetchedAt: new Date(),
       };
     } catch (error) {
-      console.error('Fetch error:', error.message);
+  console.error('FULL FETCH ERROR:', {
+    message: error.message,
+    code: error.code,
+    status: error.response?.status
+  });
+
+  return {
+    success: false,
+    error: error.code === 'ECONNABORTED'
+      ? 'IUMS server is taking too long to respond'
+      : `Could not reach IUMS: ${error.message}`,
+    code: 'FETCH_ERROR',
+  };
+}
 
       return {
         success: false,
