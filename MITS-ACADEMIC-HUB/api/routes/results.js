@@ -91,22 +91,42 @@ router.post('/fetch', async (req, res) => {
       }
     }
 
-    // Find semester config (DB or links.json fallback)
-    const semesterConfig = await findSemesterConfig(semesterId);
+   // Generate URL dynamically from enrollment number
 
-    if (!semesterConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'Semester not found or inactive',
-      });
-    }
+function getSession(semester, batchYear) {
+  const year = 2000 + batchYear;
 
-    // Build the full URL from the template
-    const fullUrl = semesterConfig.urlTemplate.replace(
-      /\{ENROLLMENT\}/g,
-      encodeURIComponent(cleanedEnrollment)
-    );
+  if (semester % 2 === 1) {
+    return `11${year + Math.floor((semester - 1) / 2)}`;
+  }
 
+  return `04${year + (semester / 2)}`;
+}
+
+const batchYear = parseInt(
+  cleanedEnrollment.substring(4, 6),
+  10
+);
+
+const session = getSession(
+  parseInt(semesterId, 10),
+  batchYear
+);
+
+const fullUrl =
+  `https://iums.mitsgwalior.in/ViewSC.aspx?` +
+  `U2bJdzw70jtQ3d=${encodeURIComponent(cleanedEnrollment)}` +
+  `&U3bJdzw70jtQ4d=${semesterId}` +
+  `&U4bJdzw70jtQ5d=${session}`;
+
+const semesterConfig = {
+  semesterNumber: parseInt(semesterId, 10),
+  name: `Semester ${semesterId}`,
+  id: semesterId,
+  dbRecord: null
+};
+
+console.log('Generated URL:', fullUrl);
     // Fetch results from IUMS
     let fetchResult;
     try {
