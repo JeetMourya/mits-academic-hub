@@ -87,7 +87,34 @@ app.use((req, res, next) => {
 // ============================================================================
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (req, res) => { 
+const axios = require('axios');
+
+app.get('/test-iums', async (req, res) => {
+  try {
+    const response = await axios.get(
+      'https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d=BTIT2401040&U3bJdzw70jtQ4d=2',
+      {
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      status: response.status,
+      length: response.data.length
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      message: err.message,
+      code: err.code
+    });
+  }
+});
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
