@@ -25,6 +25,7 @@
     "express-mongo-sanitize": "2.2.0",
     "express-rate-limit": "7.0.0",
     "helmet": "7.0.0",
+    "https-proxy-agent": "^9.0.0",
     "jsonwebtoken": "9.0.2",
     "mongoose": "^7.8.9",
     "morgan": "^1.11.0",

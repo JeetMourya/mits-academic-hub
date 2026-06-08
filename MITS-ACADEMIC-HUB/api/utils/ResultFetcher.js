@@ -3,11 +3,13 @@
  */
 const axios = require('axios');
 const cheerio = require('cheerio');
+const HttpsProxyAgent = require('https-proxy-agent');
 
 class ResultFetcher {
   constructor() {
     this.baseUrl = process.env.IUMS_BASE_URL || 'https://iums.mitsgwalior.in';
     this.timeout = 60000;
+    this.proxyUrl = process.env.WEBSHARE_PROXY;
   }
 
   parseResultHTML(html) {
@@ -64,14 +66,23 @@ class ResultFetcher {
   }
 
   /**
-   * Fetch results from a full URL
+   * Fetch results from a full URL with PROXY support
    */
   async fetchFromUrl(url) {
     try {
-      console.log('Fetching URL:', url);
+      console.log('[FETCH] URL:', url);
+
+      // PROXY SETUP
+      const agent = this.proxyUrl 
+        ? new HttpsProxyAgent(this.proxyUrl)
+        : null;
+
+      console.log('[PROXY]', this.proxyUrl ? '✅ ENABLED' : '❌ NOT SET');
 
       const response = await axios.get(url, {
         timeout: this.timeout,
+        httpAgent: agent,
+        httpsAgent: agent,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -97,13 +108,15 @@ class ResultFetcher {
         };
       }
 
+      console.log('[✅ SUCCESS] Results fetched successfully');
+
       return {
         success: true,
         data: parsedResult,
         fetchedAt: new Date(),
       };
     } catch (error) {
-      console.error('FULL FETCH ERROR:', {
+      console.error('[❌ FETCH ERROR]', {
         message: error.message,
         code: error.code,
         status: error.response?.status,
