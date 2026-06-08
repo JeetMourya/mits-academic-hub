@@ -95,6 +95,29 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ===== DEBUG NETWORK ENDPOINT =====
+app.get('/debug-network', (req, res) => {
+  const https = require('https');
+  const start = Date.now();
+  const options = {
+    hostname: 'iums.mitsgwalior.in',
+    port: 443,
+    path: '/',
+    method: 'HEAD',
+    timeout: 15000
+  };
+  const request = https.request(options, (response) => {
+    res.json({ success: true, timeMs: Date.now() - start });
+  });
+  request.on('error', (err) => {
+    res.json({ success: false, error: err.code, timeMs: Date.now() - start });
+  });
+  request.on('timeout', () => {
+    request.destroy();
+    res.json({ success: false, error: 'TIMEOUT', timeMs: Date.now() - start });
+  });
+  request.end();
+});
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/results', require('./routes/results'));
