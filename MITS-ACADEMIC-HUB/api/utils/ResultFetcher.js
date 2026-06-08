@@ -7,7 +7,7 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 
 class ResultFetcher {
   constructor() {
-    this.baseUrl = process.env.IUMS_BASE_URL || 'https://iums.mitsgwalior.in';
+    this.baseUrl = 'https://iums.mitsgwalior.in';
     this.timeout = 60000;
     this.proxyUrl = process.env.WEBSHARE_PROXY;
   }
@@ -66,10 +66,13 @@ class ResultFetcher {
   }
 
   /**
-   * Fetch results from a full URL with PROXY support
+   * Fetch results with correct URL format
    */
-  async fetchFromUrl(url) {
+  async fetchResults(enrollmentNumber, semester) {
     try {
+      // CORRECT URL FORMAT FOR MITS IUMS
+      const url = `${this.baseUrl}/ViewSC.aspx?RollNo=${enrollmentNumber}&sem=${semester}`;
+      
       console.log('[FETCH] URL:', url);
 
       // PROXY SETUP
@@ -86,8 +89,7 @@ class ResultFetcher {
         httpAgent: agent,
         httpsAgent: agent,
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
         maxRedirects: 5,
       });
@@ -122,7 +124,6 @@ class ResultFetcher {
         message: error.message,
         code: error.code,
         status: error.response?.status,
-        url,
       });
 
       return {
@@ -134,18 +135,6 @@ class ResultFetcher {
         code: 'FETCH_ERROR',
       };
     }
-  }
-
-  /**
-   * Legacy method
-   */
-  async fetchResults(enrollmentNumber, semesterUrl) {
-    const url = `${this.baseUrl}/${semesterUrl}`.replace(
-      '{ENROLLMENT}',
-      enrollmentNumber
-    );
-
-    return this.fetchFromUrl(url);
   }
 }
 
