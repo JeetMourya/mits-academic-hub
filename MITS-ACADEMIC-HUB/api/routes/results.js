@@ -70,7 +70,25 @@ async function findSemesterConfig(semesterId) {
 // ============================================================================
 // GET RESULTS - PUBLIC ENDPOINT (for students)
 // ============================================================================
+function getBatchYear(enrollment) {
+  return parseInt(enrollment.substring(4, 6), 10);
+}
 
+function buildDynamicResultUrl(enrollment, semester) {
+  const batchYear = getBatchYear(enrollment);
+
+  const sessionYear =
+    semester % 2 === 1
+      ? 2000 + batchYear + Math.floor((semester - 1) / 2)
+      : 2000 + batchYear + (semester / 2);
+
+  const session =
+    semester % 2 === 1
+      ? `Nov ${sessionYear}`
+      : `Apr ${sessionYear}`;
+
+  return `https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d=${enrollment}&U3bJdzw70jtQ4d=${semester}&U4bJdzw70jtQ5d=${encodeURIComponent(session)}`;
+}
 router.post('/fetch', async (req, res) => {
   try {
     const { enrollmentNumber, semesterId } = req.body;
