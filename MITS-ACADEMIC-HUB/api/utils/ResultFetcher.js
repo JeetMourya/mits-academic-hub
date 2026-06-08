@@ -3,7 +3,7 @@
  */
 const axios = require('axios');
 const cheerio = require('cheerio');
-const HttpsProxyAgent = require('https-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 class ResultFetcher {
   constructor() {
@@ -73,11 +73,13 @@ class ResultFetcher {
       console.log('[FETCH] URL:', url);
 
       // PROXY SETUP
-      const agent = this.proxyUrl 
-        ? new HttpsProxyAgent(this.proxyUrl)
-        : null;
-
-      console.log('[PROXY]', this.proxyUrl ? '✅ ENABLED' : '❌ NOT SET');
+      let agent = null;
+      if (this.proxyUrl) {
+        agent = new HttpsProxyAgent(this.proxyUrl);
+        console.log('[PROXY] ✅ ENABLED');
+      } else {
+        console.log('[PROXY] ❌ NOT SET');
+      }
 
       const response = await axios.get(url, {
         timeout: this.timeout,
