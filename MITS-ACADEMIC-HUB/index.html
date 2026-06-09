@@ -142,26 +142,41 @@
           <div class="glass card lookup-card reveal">
             <form id="lookup-form" class="lookup-form" novalidate>
               <div class="form-group">
-                <label for="enrollment-input" class="form-label">Enrollment Number</label>
-                <input
-                  type="text"
-                  id="enrollment-input"
-                  class="input"
-                  placeholder="e.g. 0108CS221042"
-                  inputmode="text"
-                  autocomplete="off"
-                  maxlength="14"
-                  required
-                >
+                <label for="enrollment-input" class="form-label">
+                  Enrollment Number
+                  <span class="form-hint">Enter your MITS enrollment to auto-detect your batch</span>
+                </label>
+                <div class="input-with-badge">
+                  <input
+                    type="text"
+                    id="enrollment-input"
+                    class="input"
+                    placeholder="e.g. BTIT25O1063 or 0108CS221042"
+                    inputmode="text"
+                    autocomplete="off"
+                    maxlength="14"
+                    required
+                  >
+                  <span id="batch-info" class="batch-badge" hidden></span>
+                </div>
                 <span id="enrollment-error" class="field-error" hidden></span>
+                <span class="field-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                  Format: BTIT<b>YY</b>OXXXX — your batch is auto-detected from the year digits
+                </span>
               </div>
 
               <div class="form-group">
-                <label for="semester-select" class="form-label">Semester</label>
+                <label for="semester-select" class="form-label">
+                  Semester
+                  <span class="form-hint">Auto-generated based on your batch year</span>
+                </label>
                 <select id="semester-select" class="input" required>
-                  <option value="">Select semester</option>
+                  <option value="">Enter enrollment first ↑</option>
                 </select>
                 <span id="semester-error" class="field-error" hidden></span>
+                <span class="field-hint" id="semester-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;" hidden>
+                  Semesters are dynamically generated. No manual config needed.
+                </span>
               </div>
 
               <div class="form-group">
@@ -212,13 +227,26 @@
                 <strong id="student-enrollment" style="font-size: 1.1rem; color: var(--text-primary);">N/A</strong>
               </div>
               <div>
-                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Course / Programme</span>
-                <strong id="student-programme" style="font-size: 1.1rem; color: var(--text-primary);">Bachelor of Technology (B.Tech)</strong>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Batch</span>
+                <strong id="student-batch" style="font-size: 1.1rem; color: var(--text-primary);">N/A</strong>
               </div>
               <div>
-                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Semester / Session</span>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 4px;">Semester</span>
                 <strong id="student-semester" style="font-size: 1.1rem; color: var(--text-primary);">N/A</strong>
               </div>
+            </div>
+
+            <!-- Grading Scale Reference -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 1.5rem; padding: 0.75rem 1rem; background: rgba(99, 102, 241, 0.03); border: 1px dashed var(--border); border-radius: var(--radius-md); font-size: 0.72rem; color: var(--text-muted);">
+              <span style="font-weight: 700; color: var(--text-secondary);">Grading Scale:</span>
+              <span>AAA=10</span><span style="color: var(--border-strong);">|</span>
+              <span>AA=9</span><span style="color: var(--border-strong);">|</span>
+              <span>A=8</span><span style="color: var(--border-strong);">|</span>
+              <span>B+=7</span><span style="color: var(--border-strong);">|</span>
+              <span>B=6</span><span style="color: var(--border-strong);">|</span>
+              <span>C=5</span><span style="color: var(--border-strong);">|</span>
+              <span>D=4</span>
+              <span style="margin-left: 8px; font-style: italic;">(NC = Non-Credit, no GP)</span>
             </div>
 
             <!-- Grades Table -->

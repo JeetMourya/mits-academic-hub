@@ -87,9 +87,16 @@ app.use((req, res, next) => {
 // ============================================================================
 
 // Health check
-app.get('/health', (req, res) => { 
-const axios = require('axios');
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
 
+// Test IUMS connectivity
+const axios = require('axios');
 app.get('/test-iums', async (req, res) => {
   try {
     const response = await axios.get(
@@ -114,12 +121,6 @@ app.get('/test-iums', async (req, res) => {
       code: err.code
     });
   }
-});
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
 });
 
 // ===== DEBUG NETWORK ENDPOINT =====
@@ -254,6 +255,3 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 module.exports = app;
-
- 
- 

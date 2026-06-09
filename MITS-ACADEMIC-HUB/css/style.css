@@ -755,6 +755,43 @@ img, svg { display: block; max-width: 100%; }
   color: var(--text-secondary);
 }
 
+/* ── Batch Badge & Form Hints ── */
+.input-with-badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.batch-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  margin-left: 10px;
+  border-radius: var(--radius-full);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: fadeIn 0.3s var(--ease-out);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  letter-spacing: 0.3px;
+}
+
+.batch-badge::before {
+  content: "🎓 ";
+  font-size: 0.7rem;
+}
+
+.form-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: 2px;
+  font-style: italic;
+}
+
 /* ── Result Lookup Dashboard ── */
 .dashboard-grid {
   display: grid;

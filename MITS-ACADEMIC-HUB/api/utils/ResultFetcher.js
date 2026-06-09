@@ -68,6 +68,72 @@ class ResultFetcher {
   /**
    * Fetch results with correct URL format
    */
+  /**
+   * Fetch results from a direct URL (used by the route which builds URLs dynamically)
+   */
+  async fetchFromUrl(url) {
+    try {
+      console.log('[FETCH-FROM-URL] URL:', url);
+
+      let agent = null;
+      if (this.proxyUrl) {
+        agent = new HttpsProxyAgent(this.proxyUrl);
+        console.log('[PROXY] ENABLED');
+      }
+
+      const response = await axios.get(url, {
+        timeout: this.timeout,
+        httpAgent: agent,
+        httpsAgent: agent,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        maxRedirects: 5,
+      });
+
+      if (!response.data || typeof response.data !== 'string') {
+        return {
+          success: false,
+          error: 'Empty response from IUMS',
+          code: 'EMPTY_RESPONSE',
+        };
+      }
+
+      const parsedResult = this.parseResultHTML(response.data);
+
+      if (!parsedResult.studentName && parsedResult.subjects.length === 0) {
+        return {
+          success: false,
+          error: 'No result found for this enrollment number',
+          code: 'NOT_FOUND',
+        };
+      }
+
+      console.log('[SUCCESS] Results fetched successfully');
+
+      return {
+        success: true,
+        data: parsedResult,
+        fetchedAt: new Date(),
+      };
+    } catch (error) {
+      console.error('[FETCH ERROR]', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+      });
+
+      return {
+        success: false,
+        error:
+          error.code === 'ECONNABORTED'
+            ? 'IUMS server is taking too long to respond'
+            : `Could not reach IUMS: ${error.message}`,
+        code: 'FETCH_ERROR',
+      };
+    }
+  }
+
   async fetchResults(enrollmentNumber, semester) {
     try {
       // CORRECT URL FORMAT FOR MITS IUMS

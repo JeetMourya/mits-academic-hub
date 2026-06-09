@@ -1,5 +1,6 @@
 /**
  * Results Routes - MITS Academic Hub
+ * Dynamic batch-aware semester generation for all future batches.
  */
 const express = require('express');
 const path = require('path');
@@ -7,12 +8,75 @@ const fs = require('fs');
 const Student = require('../models/Student');
 const Semester = require('../models/Semester');
 const ResultFetcher = require('../utils/ResultFetcher');
+const {
+  getBatchFromEnrollment,
+  getAllSemesters,
+  buildIumsUrl,
+  getAvailableSemesters,
+} = require('../utils/batchHelper');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 const resultFetcher = new ResultFetcher();
 
-// Load semester config from links.json as fallback
+/**
+ * MITS Official Grading Scale (as per actual IUMS):
+ *   AAA  → 10
+ *   AA   → 9
+ *   A    → 8
+ *   B+   → 7
+ *   B    → 6
+ *   C    → 5
+ *   D    → 4
+ *   F    → 0 (Fail)
+ *   Non-credit subjects (like NSS/NCC/etc.) → "N/A" (no grade point)
+ */
+const GRADE_POINT_MAP = {
+  'AAA': 10,
+  'AA': 9,
+  'A': 8,
+  'B+': 7,
+  'B': 6,
+  'C': 5,
+  'D': 4,
+  'F': 0,
+  'FAIL': 0,
+  'ABSENT': 0,
+  'ABS': 0,
+};
+
+// Subjects that are typically non-credit at MITS (case-insensitive check)
+const NON_CREDIT_KEYWORDS = [
+  'NSS', 'NCC', 'YOGA', 'SPORTS', 'HOLISTIC',
+  'NON-CREDIT', 'AUDIT', 'HSS',
+];
+
+function getGradePoint(grade) {
+  const g = String(grade).trim().toUpperCase();
+  return GRADE_POINT_MAP[g];
+}
+
+function isNonCreditSubject(subjectName, subjectCode) {
+  const combined = `${subjectName || ''} ${subjectCode || ''}`.toUpperCase();
+  return NON_CREDIT_KEYWORDS.some((kw) => combined.includes(kw));
+}
+
+function gradePointDisplay(grade, subjectName, subjectCode) {
+  // Non-credit subjects have no grade point
+  if (isNonCreditSubject(subjectName, subjectCode)) {
+    return 'N/A';
+  }
+  const gp = getGradePoint(grade);
+  if (gp === undefined) {
+    // Unknown grade — could be non-standard. Return 'N/A' to be safe.
+    return 'N/A';
+  }
+  return gp.toString();
+}
+
+/**
+ * Load links.json as fallback (legacy, eventually deprecated).
+ */
 function loadLinksJson() {
   try {
     const filePath = path.join(__dirname, '..', '..', 'data', 'links.json');
@@ -24,128 +88,97 @@ function loadLinksJson() {
   }
 }
 
-// Find semester config - first check DB, then fallback to links.json
-async function findSemesterConfig(semesterId) {
-  const semNum = parseInt(semesterId, 10);
-
-  // Try MongoDB first
-  try {
-    const dbSemester = await Semester.findOne({ semesterNumber: semNum, isActive: true });
-    if (dbSemester) {
-      return {
-        source: 'database',
-        id: dbSemester._id,
-        name: dbSemester.name,
-        semesterNumber: dbSemester.semesterNumber,
-        resultUrl: dbSemester.resultUrl,
-        urlTemplate: dbSemester.urlTemplate || dbSemester.resultUrl,
-        dbRecord: dbSemester,
-      };
-    }
-  } catch {
-    // MongoDB might not be connected, continue to fallback
-  }
-
-  // Fallback to links.json
-  const linksData = loadLinksJson();
-  const jsonSemester = linksData.semesters.find(
-    (s) => s.id === semNum && s.active !== false
-  );
-
-  if (jsonSemester) {
-    return {
-      source: 'json',
-      id: jsonSemester.id,
-      name: jsonSemester.name || `Semester ${semNum}`,
-      semesterNumber: semNum,
-      resultUrl: jsonSemester.urlTemplate || '',
-      urlTemplate: jsonSemester.urlTemplate || '',
-      dbRecord: null,
-    };
-  }
-
-  return null;
-}
-
 // ============================================================================
-// GET RESULTS - PUBLIC ENDPOINT (for students)
+// GET /semesters/dynamic — Generate semesters from enrollment (NEW)
 // ============================================================================
-function getBatchYear(enrollment) {
-  return parseInt(enrollment.substring(4, 6), 10);
-}
-
-function buildDynamicResultUrl(enrollment, semester) {
-  const batchYear = getBatchYear(enrollment);
-
-  const sessionYear =
-    semester % 2 === 1
-      ? 2000 + batchYear + Math.floor((semester - 1) / 2)
-      : 2000 + batchYear + (semester / 2);
-
-  const session =
-    semester % 2 === 1
-      ? `Nov ${sessionYear}`
-      : `Apr ${sessionYear}`;
-
-  return `https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d=${enrollment}&U3bJdzw70jtQ4d=${semester}&U4bJdzw70jtQ5d=${encodeURIComponent(session)}`;
-}
-router.post('/fetch', async (req, res) => {
+router.get('/semesters/dynamic', (req, res) => {
   try {
-    const { enrollmentNumber, semesterId } = req.body;
+    const { enrollment } = req.query;
 
-    // Validation
-    if (!enrollmentNumber || !semesterId) {
+    if (!enrollment) {
       return res.status(400).json({
         success: false,
-        message: 'Enrollment number and semester ID are required',
+        message: 'Enrollment number is required as query parameter',
       });
     }
 
-    // Clean enrollment number: convert to uppercase, trim, and normalize B.Tech '0' -> 'O' typos
+    const cleaned = String(enrollment).toUpperCase().trim();
+    let batchYear;
+    try {
+      batchYear = getBatchFromEnrollment(cleaned);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid enrollment format. Cannot detect batch year.',
+      });
+    }
+
+    const allSemesters = getAllSemesters(cleaned);
+    const availableSemesters = getAvailableSemesters(cleaned);
+
+    res.json({
+      success: true,
+      data: {
+        batchYear,
+        enrollment: cleaned,
+        allSemesters,
+        availableSemesters,
+      },
+    });
+  } catch (error) {
+    console.error('Dynamic semester error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate semesters',
+    });
+  }
+});
+
+// ============================================================================
+// POST /fetch — Fetch results from IUMS
+// ============================================================================
+router.post('/fetch', async (req, res) => {
+  try {
+    const { enrollmentNumber, semesterNumber } = req.body;
+
+    if (!enrollmentNumber || !semesterNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enrollment number and semester number are required',
+      });
+    }
+
+    // Clean enrollment number
     let cleanedEnrollment = enrollmentNumber.toUpperCase().trim();
+    // Auto-normalize: BTIT format with '0' at index 6 → 'O'
     if (/^BT[A-Z]{2}\d{2}[0O]\d{4}$/.test(cleanedEnrollment)) {
       if (cleanedEnrollment.charAt(6) === '0') {
         cleanedEnrollment = cleanedEnrollment.substring(0, 6) + 'O' + cleanedEnrollment.substring(7);
       }
     }
 
-   // Generate URL dynamically from enrollment number
+    const semNum = parseInt(semesterNumber, 10);
+    if (isNaN(semNum) || semNum < 1 || semNum > 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Semester number must be between 1 and 8',
+      });
+    }
 
-function getSession(semester, batchYear) {
-  const year = 2000 + batchYear;
+    let batchYear;
+    try {
+      batchYear = getBatchFromEnrollment(cleanedEnrollment);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: 'Could not detect batch year from enrollment. Expected format: BTIT<YY>O...',
+      });
+    }
 
-  if (semester % 2 === 1) {
-    return `11${year + Math.floor((semester - 1) / 2)}`;
-  }
+    const fullUrl = buildIumsUrl(cleanedEnrollment, semNum);
+    console.log(`[RESULT-FETCH] Batch=${batchYear} Sem=${semNum} URL=${fullUrl}`);
 
-  return `04${year + (semester / 2)}`;
-}
-
-const batchYear = parseInt(
-  cleanedEnrollment.substring(4, 6),
-  10
-);
-
-const session = getSession(
-  parseInt(semesterId, 10),
-  batchYear
-);
-
-const fullUrl =
-  `https://iums.mitsgwalior.in/ViewSC.aspx?` +
-  `U2bJdzw70jtQ3d=${encodeURIComponent(cleanedEnrollment)}` +
-  `&U3bJdzw70jtQ4d=${semesterId}` +
-  `&U4bJdzw70jtQ5d=${session}`;
-
-const semesterConfig = {
-  semesterNumber: parseInt(semesterId, 10),
-  name: `Semester ${semesterId}`,
-  id: semesterId,
-  dbRecord: null
-};
-
-console.log('Generated URL:', fullUrl);
-    // Fetch results from IUMS
+    // Fetch from IUMS
     let fetchResult;
     try {
       fetchResult = await resultFetcher.fetchFromUrl(fullUrl);
@@ -153,18 +186,27 @@ console.log('Generated URL:', fullUrl);
       console.error('IUMS fetch failed:', fetchError.message);
       return res.status(502).json({
         success: false,
-        message: 'The MITS IUMS server is temporarily unreachable or taking too long to respond. Please try again in a moment.',
+        message: 'The MITS IUMS server is temporarily unreachable. Please try again.',
       });
     }
 
     if (!fetchResult.success) {
       return res.status(404).json({
         success: false,
-        message: fetchResult.error || 'No result found for this enrollment number in the selected semester.',
+        message: fetchResult.error || 'No result found.',
       });
     }
 
-    // Try to save to DB (non-blocking, don't fail if DB is down)
+    // Grade points with proper mapping
+    const subjectsWithGrading = (fetchResult.data.subjects || []).map((sub) => ({
+      code: sub.code || '',
+      name: sub.name || '',
+      grade: sub.grade || '',
+      gradePoint: gradePointDisplay(sub.grade, sub.name, sub.code),
+      isNonCredit: isNonCreditSubject(sub.name, sub.code),
+    }));
+
+    // Save to DB (non-blocking)
     try {
       let student = await Student.findOne({ enrollmentNumber: cleanedEnrollment });
 
@@ -173,39 +215,35 @@ console.log('Generated URL:', fullUrl);
           enrollmentNumber: cleanedEnrollment,
           name: fetchResult.data.studentName,
         });
+      } else if (fetchResult.data.studentName) {
+        student.name = fetchResult.data.studentName;
       }
 
-      // Add/update result
       const existingResult = student.results.find(
-        (r) => r.semesterNumber === semesterConfig.semesterNumber
+        (r) => r.semesterNumber === semNum
       );
+
       if (existingResult) {
         existingResult.sgpa = fetchResult.data.sgpa;
-        existingResult.subjects = fetchResult.data.subjects;
+        existingResult.subjects = subjectsWithGrading;
         existingResult.fetchedAt = new Date();
       } else {
         student.results.push({
-          semesterNumber: semesterConfig.semesterNumber,
+          semesterNumber: semNum,
           sgpa: fetchResult.data.sgpa,
-          subjects: fetchResult.data.subjects,
+          subjects: subjectsWithGrading,
           fetchedAt: new Date(),
         });
       }
 
       student.searchHistory.push({
-        semesterId: semesterConfig.id,
-        semesterName: semesterConfig.name,
+        semesterId: String(semNum),
+        semesterName: `Semester ${semNum}`,
         fetchedAt: new Date(),
       });
 
       student.lastResultFetch = new Date();
       await student.save();
-
-      // Update semester stats if from DB
-      if (semesterConfig.dbRecord) {
-        semesterConfig.dbRecord.resultsFetched += 1;
-        await semesterConfig.dbRecord.save();
-      }
     } catch (dbErr) {
       console.warn('DB save skipped:', dbErr.message);
     }
@@ -216,10 +254,11 @@ console.log('Generated URL:', fullUrl);
       data: {
         studentName: fetchResult.data.studentName,
         enrollmentNumber: fetchResult.data.enrollmentNumber || cleanedEnrollment,
-        semester: semesterConfig.semesterNumber,
+        batchYear,
+        semester: semNum,
         sgpa: fetchResult.data.sgpa,
         status: fetchResult.data.status,
-        subjects: fetchResult.data.subjects,
+        subjects: subjectsWithGrading,
         directUrl: fullUrl,
         fetchedAt: new Date(),
       },
@@ -234,9 +273,8 @@ console.log('Generated URL:', fullUrl);
 });
 
 // ============================================================================
-// GET STUDENT RESULT HISTORY - ADMIN ENDPOINT
+// GET /student/:enrollmentNumber — Admin: Student result history
 // ============================================================================
-
 router.get('/student/:enrollmentNumber', authenticate, async (req, res) => {
   try {
     const student = await Student.findOne({
@@ -269,12 +307,10 @@ router.get('/student/:enrollmentNumber', authenticate, async (req, res) => {
 });
 
 // ============================================================================
-// GET SEMESTERS
+// GET /semesters — List active semesters (legacy, kept for admin panel)
 // ============================================================================
-
 router.get('/semesters', async (req, res) => {
   try {
-    // Try DB first
     let semesters = [];
     try {
       semesters = await Semester.find({ isActive: true })
@@ -284,7 +320,6 @@ router.get('/semesters', async (req, res) => {
       // DB might not be connected
     }
 
-    // Fallback to links.json if no DB semesters
     if (!semesters || semesters.length === 0) {
       const linksData = loadLinksJson();
       semesters = linksData.semesters
@@ -311,3 +346,7 @@ router.get('/semesters', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.GRADE_POINT_MAP = GRADE_POINT_MAP;
+module.exports.getGradePoint = getGradePoint;
+module.exports.isNonCreditSubject = isNonCreditSubject;
+module.exports.gradePointDisplay = gradePointDisplay;
