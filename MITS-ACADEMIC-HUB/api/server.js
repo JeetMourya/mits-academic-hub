@@ -255,3 +255,8 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 module.exports = app;
+// Serve admin index.html for any /admin/* route (SPA fallback)
+app.get('/admin/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin/index.html')); 
+  // Agar public/admin folder alag hai toh path change karo
+});

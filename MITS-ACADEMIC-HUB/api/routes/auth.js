@@ -54,8 +54,23 @@ const logActivity = async (type, adminId, email, details = {}, status = 'success
 // LOGIN
 // ============================================================================
 
-router.post('/login', async (req, res) => {
-  try {
+router.post('/login', async (req, res) => {   // 🔥 DEMO MODE BYPASS (Tab tak jab tak DB connect nahi ho raha)
+  const { email, password } = req.body;
+
+  if (!process.env.MONGODB_URI || process.env.NODE_ENV === 'development') {
+    if (email === 'admin@admin.com' && password === 'admin123') {
+      return res.status(200).json({
+        success: true,
+        token: 'demo-jwt-token-12345',
+        admin: {
+          name: 'Super Admin',
+          email: 'admin@admin.com',
+          role: 'superadmin'
+        }
+      });
+    }
+  }
+  try {  
     const { email, password } = req.body;
 
     // Validation
@@ -234,3 +249,24 @@ router.get('/verify', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+
+// 🔥 DEMO PROFILE ROUTE (Jab tak DB nahi judta)
+router.get('/me', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token === 'demo-jwt-token-12345' || !process.env.MONGODB_URI) {
+    return res.status(200).json({
+      success: true,
+      admin: {
+        name: 'Super Admin',
+        email: 'admin@admin.com',
+        role: 'superadmin'
+      }
+    });
+  }
+  // Baki original verify logic (agar DB connected hai)
+  try {
+    // ... original code
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+});
