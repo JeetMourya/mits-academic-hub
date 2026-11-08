@@ -199,7 +199,7 @@ app.use((err, req, res, next) => {
 async function connectDB() {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 15000,
     });
 
     console.log(`✓ MongoDB connected: ${conn.connection.host}`);
