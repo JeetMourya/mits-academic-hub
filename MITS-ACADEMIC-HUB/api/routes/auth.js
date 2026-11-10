@@ -54,24 +54,10 @@ const logActivity = async (type, adminId, email, details = {}, status = 'success
 // LOGIN
 // ============================================================================
 
-router.post('/login', async (req, res) => {   // 🔥 DEMO MODE BYPASS (Tab tak jab tak DB connect nahi ho raha)
-  const { email, password } = req.body;
-
-  if (!process.env.MONGODB_URI || process.env.NODE_ENV === 'development') {
-    if (email === 'admin@admin.com' && password === 'admin123') {
-      return res.status(200).json({
-        success: true,
-        token: 'demo-jwt-token-12345',
-        admin: {
-          name: 'Super Admin',
-          email: 'admin@admin.com',
-          role: 'superadmin'
-        }
-      });
-    }
-  }
-  try {  
-    const { email, password } = req.body;
+router.post('/login', async (req, res) => {
+  try {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
     // Validation
     if (!email || !password) {
@@ -248,25 +234,31 @@ router.get('/verify', authenticate, async (req, res) => {
   }
 });
 
-module.exports = router;
+// ============================================================================
+// CURRENT ADMIN (token-verified; no demo tokens)
+// ============================================================================
 
-// 🔥 DEMO PROFILE ROUTE (Jab tak DB nahi judta)
-router.get('/me', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (token === 'demo-jwt-token-12345' || !process.env.MONGODB_URI) {
-    return res.status(200).json({
-      success: true,
-      admin: {
-        name: 'Super Admin',
-        email: 'admin@admin.com',
-        role: 'superadmin'
-      }
-    });
-  }
-  // Baki original verify logic (agar DB connected hai)
+router.get('/me', authenticate, async (req, res) => {
   try {
-    // ... original code
+    const admin = await Admin.findById(req.admin.id).select('-password');
+    if (!admin || !admin.isActive) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    res.json({
+      success: true,
+      data: {
+        admin: {
+          id: admin._id,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role,
+          permissions: admin.permissions,
+        },
+      },
+    });
   } catch (error) {
     res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 });
+
+module.exports = router;

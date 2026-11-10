@@ -1,5 +1,5 @@
 /**
- * MITS Academic Hub — Main Application v2.0
+ * MITS Academic Hub - Main Application v2.0
  * Dynamic batch-aware: detects batch from enrollment, generates correct sessions.
  * Professional college portal UX redesign.
  */
@@ -14,9 +14,9 @@
 
   /**
    * MITS IUMS Official Grading Scale:
-   *   AAA → 10, AA → 9, A → 8, B+ → 7, B → 6, C → 5, D → 4
-   *   F / FAIL / ABSENT → 0
-   *   Non-credit subjects → "N/A"
+   *   AAA -> 10, AA -> 9, A -> 8, B+ -> 7, B -> 6, C -> 5, D -> 4
+   *   F / FAIL / ABSENT -> 0
+   *   Non-credit subjects -> "N/A"
    */
   const GRADE_POINT_MAP = {
     'AAA': 10,
@@ -53,7 +53,7 @@
     return gp !== undefined ? gp.toString() : 'N/A';
   }
 
-  /* ── Data Loading: Dynamic Semester Generation ── */
+  /* — Data Loading: Dynamic Semester Generation — */
 
   async function loadSemestersForEnrollment(enrollment) {
     try {
@@ -93,7 +93,7 @@
           currentSemesters.push({
             id: s,
             name: `Semester ${s} (${month} ${year})`,
-            label: `Sem ${s} · ${month} ${year}`,
+            label: `Sem ${s}  -  ${month} ${year}`,
             sessionCode: `${month === 'Apr' ? '04' : '11'}${year}`,
             available: true,
           });
@@ -117,14 +117,14 @@
           currentSemesters = json.data.map((s) => ({
             id: s.semesterNumber || s.id,
             name: s.name,
-            label: s.name + (s.description ? ` · ${s.description}` : ''),
+            label: s.name + (s.description ? `  -  ${s.description}` : ''),
             available: true,
           }));
           return currentSemesters;
         }
       }
     } catch {
-      // DB not connected — try links.json
+      // DB not connected - try links.json
     }
     try {
       const res = await fetch('data/links.json');
@@ -173,13 +173,13 @@
     });
   }
 
-  /* ── Validation ── */
+  /* — Validation — */
 
   function validateEnrollment(value) {
     let trimmed = String(value).trim().toUpperCase();
     if (!trimmed) return { valid: false, message: 'Enrollment number is required' };
 
-    // Auto-normalize: BTIT format with '0' at index 6 → 'O'
+    // Auto-normalize: BTIT format with '0' at index 6 -> 'O'
     if (/^BT[A-Z]{2}\d{2}[0O]\d{4}$/.test(trimmed)) {
       if (trimmed.charAt(6) === '0') {
         trimmed = trimmed.substring(0, 6) + 'O' + trimmed.substring(7);
@@ -202,7 +202,7 @@
     return { valid: true, semesterNumber: semNum };
   }
 
-  /* ── UI Helpers ── */
+  /* — UI Helpers — */
 
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
@@ -211,9 +211,14 @@
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.setAttribute('role', 'alert');
-    toast.innerHTML = `
-      <span class="toast-icon">${type === 'error' ? '✕' : type === 'success' ? '✓' : 'ℹ'}</span>
-      <span class="toast-message">${message}</span>`;
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = type === 'error' ? '\u2715' : type === 'success' ? '\u2713' : '\u2139';
+    const text = document.createElement('span');
+    text.className = 'toast-message';
+    text.textContent = String(message);
+    toast.append(icon, text);
 
     container.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('visible'));
@@ -231,7 +236,7 @@
       btn.disabled = isLoading;
       btn.classList.toggle('loading', isLoading);
       const label = btn.querySelector('.btn-label');
-      if (label) label.textContent = isLoading ? 'Fetching result…' : 'View Result';
+      if (label) label.textContent = isLoading ? 'Fetching result…' : 'Verify and Fetch Result';
     }
     if (overlay) overlay.hidden = !isLoading;
   }
@@ -254,7 +259,7 @@
     });
   }
 
-  /* ── Grade Badge Styling ── */
+  /* — Grade Badge Styling — */
 
   function gradeBadgeStyle(grade) {
     const g = String(grade || '').trim().toUpperCase();
@@ -267,7 +272,7 @@
     return { bg: 'var(--accent-soft)', color: 'var(--accent)' };
   }
 
-  /* ── Actions ── */
+  /* — Actions — */
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -275,6 +280,8 @@
 
     const enrollmentInput = document.getElementById('enrollment-input');
     const semesterSelect = document.getElementById('semester-select');
+    const examTypeSelect = document.getElementById('exam-type-select');
+    const examType = examTypeSelect?.value || 'Regular';
     const captchaInput = document.getElementById('captcha-input');
 
     const enrollmentCheck = validateEnrollment(enrollmentInput?.value);
@@ -290,8 +297,9 @@
     }
 
     if (!window.MITSCaptcha?.verify(captchaInput?.value)) {
-      showFieldError('captcha-input', 'captcha-error', 'Captcha verification failed. Try again.');
+      // Refresh first: refresh() clears the error, so show the message afterwards.
       window.MITSCaptcha?.refresh();
+      showFieldError('captcha-input', 'captcha-error', 'CAPTCHA did not match. A new code has been generated - please try again.');
       return;
     }
 
@@ -299,15 +307,9 @@
 
     // Build URL and add to history
     const enrolledValue = enrollmentCheck.value;
+    // The real IUMS link (with the server-selected session) arrives with the
+    // result; until then this is only a provisional value.
     lastGeneratedUrl = `https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d=${encodeURIComponent(enrolledValue)}&U3bJdzw70jtQ4d=${semesterCheck.semesterNumber}`;
-
-    window.MITSHistory?.add({
-      enrollment: enrolledValue,
-      semesterId: String(semesterCheck.semesterNumber),
-      semesterName: `Semester ${semesterCheck.semesterNumber}`,
-      url: lastGeneratedUrl,
-    });
-    window.MITSHistory?.render('history-list', handleHistorySelect);
 
     try {
       const response = await fetch('/api/results/fetch', {
@@ -316,6 +318,7 @@
         body: JSON.stringify({
           enrollmentNumber: enrolledValue,
           semesterNumber: semesterCheck.semesterNumber,
+          examType,
         }),
       });
 
@@ -338,6 +341,18 @@
       }
 
       const data = result.data;
+      if (data && data.directUrl) lastGeneratedUrl = data.directUrl;
+
+      // Save history only after a successful fetch, with the exam type.
+      window.MITSHistory?.add({
+        enrollment: enrolledValue,
+        semesterId: String(semesterCheck.semesterNumber),
+        examType: data.examType || examType,
+        semesterName: `Semester ${semesterCheck.semesterNumber}`,
+        url: lastGeneratedUrl,
+      });
+      window.MITSHistory?.render('history-list', handleHistorySelect);
+
       const hasData = data.studentName || (data.subjects && data.subjects.length > 0);
 
       if (hasData && resultBox) {
@@ -397,14 +412,14 @@
 
               tr.innerHTML = `
                 <td style="padding: 0.9rem 1rem; color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums;">
-                  ${subject.code || '—'}
+                  ${subject.code || '-'}
                 </td>
                 <td style="padding: 0.9rem 1rem; color: var(--text-secondary);">
-                  ${subject.name || '—'}
+                  ${subject.name || '-'}
                   ${isNonCredit ? '<span style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); background: var(--bg-subtle); padding: 1px 6px; border-radius: var(--radius-xs); margin-left: 8px; font-weight: 600;">NC</span>' : ''}
                 </td>
                 <td style="padding: 0.9rem 1rem; text-align: center;">
-                  ${gradeVal ? `<span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: var(--radius-full); font-weight: 700; font-size: 0.8rem; background: ${badgeStyle.bg}; color: ${badgeStyle.color}; min-width: 38px;">${gradeVal}</span>` : '<span style="color: var(--text-muted);">—</span>'}
+                  ${gradeVal ? `<span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: var(--radius-full); font-weight: 700; font-size: 0.8rem; background: ${badgeStyle.bg}; color: ${badgeStyle.color}; min-width: 38px;">${gradeVal}</span>` : '<span style="color: var(--text-muted);">-</span>'}
                 </td>
                 <td style="padding: 0.9rem 1rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums;">
                   ${isNonCredit ? '<span style="color: var(--text-muted); font-weight: 500; font-style: italic;">N/A</span>' : `<span style="color: ${gp === '0' ? 'var(--error)' : 'var(--text-primary)'};">${gp}</span>`}
@@ -444,9 +459,14 @@
     window.MITSCaptcha?.refresh();
   }
 
-  function handleHistorySelect({ enrollment, semesterId }) {
+  function handleHistorySelect({ enrollment, semesterId, examType }) {
     const enrollmentInput = document.getElementById('enrollment-input');
     const semesterSelect = document.getElementById('semester-select');
+    const examTypeSelect = document.getElementById('exam-type-select');
+    if (examTypeSelect) {
+      examTypeSelect.value = examType === 'Ex' ? 'Ex' : 'Regular';
+      examTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     if (enrollmentInput) {
       enrollmentInput.value = enrollment;
       // Trigger dynamic semester load
@@ -466,7 +486,7 @@
     showToast('History cleared', 'info');
   }
 
-  /* ── Navigation ── */
+  /* — Navigation — */
 
   function initNav() {
     const nav = document.getElementById('navbar');
@@ -525,23 +545,27 @@
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
   }
 
-  /* ── Init ── */
+  /* — Init — */
 
   async function init() {
     window.MITSTheme?.init();
     initNav();
     initAnimations();
 
-    // Default semester load (generic, will be overridden on enrollment input)
+    // Default semester load runs in the background so the form is usable
+    // immediately, even if the semester API is slow or the database is down.
+    (async () => {
     try {
       const res = await fetch('/api/results/semesters');
+      // If the student already entered an enrollment, their batch-aware list wins.
+      if ((document.getElementById('enrollment-input')?.value || '').length >= 8) return;
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data?.length) {
           currentSemesters = json.data.map((s) => ({
             id: s.semesterNumber || s.id,
             name: s.name,
-            label: s.name + (s.description ? ` · ${s.description}` : ''),
+            label: s.name + (s.description ? `  -  ${s.description}` : ''),
             available: true,
           }));
           populateStaticSelect();
@@ -550,11 +574,12 @@
     } catch {
       populateStaticSelect();
     }
+    })();
 
     function populateStaticSelect() {
       const select = document.getElementById('semester-select');
       if (!select) return;
-      select.innerHTML = '<option value="">Enter enrollment first →</option>';
+      select.innerHTML = '<option value="">Enter enrollment first -></option>';
       if (currentSemesters.length > 0) {
         select.innerHTML = '<option value="">Select semester</option>';
         currentSemesters

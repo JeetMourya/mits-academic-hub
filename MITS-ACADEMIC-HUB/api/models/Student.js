@@ -1,7 +1,56 @@
 /**
  * Student Model - MITS Academic Hub
+ * Supports separate Regular and Ex/Backlog attempts.
  */
 const mongoose = require('mongoose');
+
+const subjectSchema = new mongoose.Schema({
+  code: String,
+  name: String,
+  grade: String,
+  credits: Number,
+  gpa: Number,
+  gradePoint: mongoose.Schema.Types.Mixed,
+  isNonCredit: Boolean,
+  passed: Boolean,
+}, { _id: false });
+
+const resultSchema = new mongoose.Schema({
+  semesterNumber: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 8,
+  },
+  examType: {
+    type: String,
+    enum: ['Regular', 'Ex'],
+    default: 'Regular',
+  },
+  attemptNumber: {
+    type: Number,
+    default: 1,
+    min: 1,
+  },
+  sessionCode: {
+    type: String,
+    default: '',
+  },
+  resultStatus: {
+    type: String,
+    default: '',
+  },
+  directUrl: {
+    type: String,
+    default: '',
+  },
+  sgpa: Number,
+  subjects: [subjectSchema],
+  fetchedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 const studentSchema = new mongoose.Schema({
   enrollmentNumber: {
@@ -22,18 +71,7 @@ const studentSchema = new mongoose.Schema({
   phone: String,
   department: String,
   semester: Number,
-  results: [{
-    semesterNumber: Number,
-    sgpa: Number,
-    subjects: [{
-      code: String,
-      name: String,
-      grade: String,
-      credits: Number,
-      gpa: Number,
-    }],
-    fetchedAt: Date,
-  }],
+  results: [resultSchema],
   searchHistory: [{
     semesterId: String,
     semesterName: String,
@@ -53,9 +91,13 @@ const studentSchema = new mongoose.Schema({
   },
 });
 
-// Index for common queries
 studentSchema.index({ enrollmentNumber: 1 });
 studentSchema.index({ email: 1 });
 studentSchema.index({ 'searchHistory.fetchedAt': -1 });
+studentSchema.index({
+  enrollmentNumber: 1,
+  'results.semesterNumber': 1,
+  'results.examType': 1,
+});
 
 module.exports = mongoose.model('Student', studentSchema);

@@ -8,11 +8,14 @@ const fs = require('fs');
 const Student = require('../models/Student');
 const Semester = require('../models/Semester');
 const ResultFetcher = require('../utils/ResultFetcher');
+const rateLimit = require('express-rate-limit');
+const academic = require('../../js/academic.js');
 const {
   getBatchFromEnrollment,
   getAllSemesters,
   buildIumsUrl,
   getAvailableSemesters,
+  resolveExamSession,
 } = require('../utils/batchHelper');
 const { authenticate } = require('../middleware/auth');
 
@@ -31,19 +34,15 @@ const resultFetcher = new ResultFetcher();
  *   F    → 0 (Fail)
  *   Non-credit subjects (like NSS/NCC/etc.) → "N/A" (no grade point)
  */
-const GRADE_POINT_MAP = {
-  'AAA': 10,
-  'AA': 9,
-  'A': 8,
-  'B+': 7,
-  'B': 6,
-  'C': 5,
-  'D': 4,
-  'F': 0,
-  'FAIL': 0,
-  'ABSENT': 0,
-  'ABS': 0,
-};
+// Single source of truth: js/academic.js (FL / IL / WL = 0 included).
+const GRADE_POINT_MAP = Object.freeze({
+  ...academic.GRADE_POINTS,
+  F: 0,
+  FAIL: 0,
+  ABSENT: 0,
+  ABS: 0,
+  AB: 0,
+});
 
 // Subjects that are typically non-credit at MITS (case-insensitive check)
 const NON_CREDIT_KEYWORDS = [
@@ -52,7 +51,8 @@ const NON_CREDIT_KEYWORDS = [
 ];
 
 function getGradePoint(grade) {
-  const g = String(grade).trim().toUpperCase();
+  const g = academic.normalizeGrade(grade == null ? '' : grade);
+  if (!g) return undefined;
   return GRADE_POINT_MAP[g];
 }
 
@@ -137,9 +137,18 @@ router.get('/semesters/dynamic', (req, res) => {
 // ============================================================================
 // POST /fetch — Fetch results from IUMS
 // ============================================================================
-router.post('/fetch', async (req, res) => {
+const fetchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.FETCH_RATE_LIMIT_MAX, 10) || 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many result requests. Please wait a few minutes and try again.' },
+});
+
+router.post('/fetch', fetchLimiter, async (req, res) => {
   try {
-    const { enrollmentNumber, semesterNumber } = req.body;
+    const { enrollmentNumber, semesterNumber } = req.body || {};
+    const examType = String((req.body && req.body.examType) || 'Regular').trim();
 
     if (!enrollmentNumber || !semesterNumber) {
       return res.status(400).json({
@@ -149,8 +158,8 @@ router.post('/fetch', async (req, res) => {
     }
 
     // Clean enrollment number
-    let cleanedEnrollment = enrollmentNumber.toUpperCase().trim();
-    // Auto-normalize: BTIT format with '0' at index 6 → 'O'
+    let cleanedEnrollment = String(enrollmentNumber).toUpperCase().trim();
+    // Auto-normalize: BTIT format with '0' at index 6 -> 'O'
     if (/^BT[A-Z]{2}\d{2}[0O]\d{4}$/.test(cleanedEnrollment)) {
       if (cleanedEnrollment.charAt(6) === '0') {
         cleanedEnrollment = cleanedEnrollment.substring(0, 6) + 'O' + cleanedEnrollment.substring(7);
@@ -175,10 +184,38 @@ router.post('/fetch', async (req, res) => {
       });
     }
 
-    const fullUrl = buildIumsUrl(cleanedEnrollment, semNum);
-    console.log(`[RESULT-FETCH] Batch=${batchYear} Sem=${semNum} URL=${fullUrl}`);
+    if (!['Regular', 'Ex'].includes(examType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Exam type must be Regular or Ex',
+      });
+    }
 
-    // Fetch from IUMS
+    // Session code comes ONLY from trusted server-side rules.
+    const resolved = resolveExamSession(batchYear, semNum, examType);
+    if (!resolved.ok) {
+      return res.status(400).json({ success: false, message: resolved.message });
+    }
+    const sessionCode = resolved.sessionCode;
+
+    // A browser-supplied session code is never used; reject mismatches loudly.
+    const clientSession = req.body.sessionCode ? String(req.body.sessionCode).trim() : '';
+    if (clientSession && clientSession !== sessionCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Custom session codes are not accepted. The server selects the verified session.',
+      });
+    }
+
+    const urlObject = new URL(buildIumsUrl(cleanedEnrollment, semNum));
+    urlObject.searchParams.set('U4bJdzw70jtQ5d', sessionCode);
+    const fullUrl = urlObject.toString();
+
+    console.log(
+      `[RESULT-FETCH] Batch=${batchYear} Sem=${semNum} Type=${examType} Session=${sessionCode}`
+    );
+
+// Fetch from IUMS
     let fetchResult;
     try {
       fetchResult = await resultFetcher.fetchFromUrl(fullUrl);
@@ -204,9 +241,11 @@ router.post('/fetch', async (req, res) => {
       grade: sub.grade || '',
       gradePoint: gradePointDisplay(sub.grade, sub.name, sub.code),
       isNonCredit: isNonCreditSubject(sub.name, sub.code),
+      passed: academic.isPassingGrade(sub.grade),
     }));
 
     // Save to DB (non-blocking)
+    let savedAttempt = 1;
     try {
       let student = await Student.findOne({ enrollmentNumber: cleanedEnrollment });
 
@@ -219,26 +258,50 @@ router.post('/fetch', async (req, res) => {
         student.name = fetchResult.data.studentName;
       }
 
-      const existingResult = student.results.find(
-        (r) => r.semesterNumber === semNum
-      );
+      const existingResult = student.results.find((r) => {
+        const savedType = r.examType || 'Regular';
+        const savedSession = r.sessionCode || '';
+        return (
+          r.semesterNumber === semNum &&
+          savedType === examType &&
+          (savedSession === sessionCode ||
+            (examType === 'Regular' && !savedSession))
+        );
+      });
 
       if (existingResult) {
         existingResult.sgpa = fetchResult.data.sgpa;
         existingResult.subjects = subjectsWithGrading;
+        existingResult.examType = examType;
+        existingResult.sessionCode = sessionCode;
+        existingResult.resultStatus = fetchResult.data.status || '';
+        existingResult.directUrl = fullUrl;
         existingResult.fetchedAt = new Date();
+        savedAttempt = Number(existingResult.attemptNumber || 1);
       } else {
+        const previousAttempts = student.results
+          .filter((r) => r.semesterNumber === semNum)
+          .map((r) => Number(r.attemptNumber || 1));
+
+        savedAttempt = previousAttempts.length
+          ? Math.max(...previousAttempts) + 1
+          : 1;
         student.results.push({
           semesterNumber: semNum,
+          examType,
+          attemptNumber: savedAttempt,
+          sessionCode,
+          resultStatus: fetchResult.data.status || '',
+          directUrl: fullUrl,
           sgpa: fetchResult.data.sgpa,
           subjects: subjectsWithGrading,
           fetchedAt: new Date(),
         });
       }
 
-      student.searchHistory.push({
+student.searchHistory.push({
         semesterId: String(semNum),
-        semesterName: `Semester ${semNum}`,
+        semesterName: `Semester ${semNum} (${examType})`,
         fetchedAt: new Date(),
       });
 
@@ -256,6 +319,9 @@ router.post('/fetch', async (req, res) => {
         enrollmentNumber: fetchResult.data.enrollmentNumber || cleanedEnrollment,
         batchYear,
         semester: semNum,
+        examType,
+        attemptNumber: savedAttempt,
+        sessionCode,
         sgpa: fetchResult.data.sgpa,
         status: fetchResult.data.status,
         subjects: subjectsWithGrading,

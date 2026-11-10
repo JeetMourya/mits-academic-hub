@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node api/server.js",
     "dev": "node api/server.js",
-    "test": "node --test tests/academic.test.js",
+    "test": "node --test tests/academic.test.js tests/backend.test.js",
     "build": "echo 'Build complete'",
     "lint": "echo 'Linting complete'"
   },

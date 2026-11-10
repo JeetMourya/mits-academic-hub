@@ -95,57 +95,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Test IUMS connectivity
-const axios = require('axios');
-app.get('/test-iums', async (req, res) => {
-  try {
-    const response = await axios.get(
-      'https://iums.mitsgwalior.in/ViewSC.aspx?U2bJdzw70jtQ3d=BTIT2401040&U3bJdzw70jtQ4d=2',
-      {
-        timeout: 30000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0'
-        }
-      }
-    );
-
-    res.json({
-      success: true,
-      status: response.status,
-      length: response.data.length
-    });
-  } catch (err) {
-    res.json({
-      success: false,
-      message: err.message,
-      code: err.code
-    });
-  }
-});
-
-// ===== DEBUG NETWORK ENDPOINT =====
-app.get('/debug-network', (req, res) => {
-  const https = require('https');
-  const start = Date.now();
-  const options = {
-    hostname: 'iums.mitsgwalior.in',
-    port: 443,
-    path: '/',
-    method: 'HEAD',
-    timeout: 15000
-  };
-  const request = https.request(options, (response) => {
-    res.json({ success: true, timeMs: Date.now() - start });
-  });
-  request.on('error', (err) => {
-    res.json({ success: false, error: err.code, timeMs: Date.now() - start });
-  });
-  request.on('timeout', () => {
-    request.destroy();
-    res.json({ success: false, error: 'TIMEOUT', timeMs: Date.now() - start });
-  });
-  request.end();
-});
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/results', require('./routes/results'));
@@ -154,14 +103,29 @@ app.use('/api/students', require('./routes/students'));
 app.use('/api/semesters', require('./routes/semesters'));
 
 // Frontend static files
+// Only whitelisted public folders are served. The project root (api/, tests/,
+// package.json, *.backup files, docs) is deliberately NOT exposed.
 const publicDir = path.join(__dirname, '..');
-app.use(express.static(publicDir));
+// Backup/leftover files may sit inside public folders; never serve them.
+app.use((req, res, next) => {
+  if (/\.(backup|bak|orig|old|log|err|map)(\.|$)|\.backup/i.test(req.path)) {
+    return res.status(404).json({ success: false, message: 'Route not found' });
+  }
+  next();
+});
+['css', 'js', 'assets', 'admin'].forEach((dir) => {
+  app.use('/' + dir, express.static(path.join(publicDir, dir), { dotfiles: 'deny', index: false }));
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-app.get('/admin', (req, res) => {
+app.get('/data/links.json', (req, res) => {
+  res.sendFile(path.join(publicDir, 'data', 'links.json'));
+});
+
+app.get(['/admin', '/admin/'], (req, res) => {
   res.sendFile(path.join(publicDir, 'admin', 'index.html'));
 });
 
@@ -255,8 +219,3 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 module.exports = app;
-// Serve admin index.html for any /admin/* route (SPA fallback)
-app.get('/admin/*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/admin/index.html')); 
-  // Agar public/admin folder alag hai toh path change karo
-});

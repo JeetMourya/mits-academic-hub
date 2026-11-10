@@ -29,7 +29,7 @@
       const icon = btn.querySelector('.theme-icon');
       const label = btn.querySelector('.theme-label');
       if (icon) {
-        icon.textContent = resolved === 'dark' ? '☀️' : '🌙';
+        icon.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-' + (resolved === 'dark' ? 'sun' : 'moon') + '"/></svg>';
       }
       if (label) {
         label.textContent = resolved === 'dark' ? 'Light mode' : 'Dark mode';
@@ -48,17 +48,17 @@
   }
 
   function toggleTheme() {
-    const current = getStoredTheme() || 'dark';
+    const current = getStoredTheme() || 'light';
     setTheme(current === 'dark' ? 'light' : 'dark');
   }
 
   function init() {
-    const stored = getStoredTheme() || 'dark';
+    const stored = getStoredTheme() || 'light';
     applyTheme(stored);
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       if (!getStoredTheme()) {
-        applyTheme('dark');
+        applyTheme('light');
       }
     });
 

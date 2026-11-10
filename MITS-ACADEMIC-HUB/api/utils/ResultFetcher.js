@@ -73,7 +73,13 @@ class ResultFetcher {
    */
   async fetchFromUrl(url) {
     try {
-      console.log('[FETCH-FROM-URL] URL:', url);
+      const parsedUrl = new URL(url);
+
+console.log('[FETCH-FROM-URL]', {
+  host: parsedUrl.hostname,
+  path: parsedUrl.pathname,
+  parameterNames: [...parsedUrl.searchParams.keys()]
+});
 
       let agent = null;
       if (this.proxyUrl) {
@@ -89,6 +95,12 @@ class ResultFetcher {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
         maxRedirects: 5,
+      });
+
+      console.log('[IUMS RESPONSE]', {
+        status: response.status,
+        contentType: response.headers['content-type'],
+        finalUrl: response.request?.res?.responseUrl
       });
 
       if (!response.data || typeof response.data !== 'string') {

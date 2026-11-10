@@ -25,17 +25,34 @@
     }
   }
 
+  /** Legacy entries have no examType: they were Regular searches. */
+  function typeOf(item) {
+    return item && item.examType === 'Ex' ? 'Ex' : 'Regular';
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function sameEntry(item, enrollment, semesterId, examType) {
+    return item.enrollment === enrollment &&
+      String(item.semesterId) === String(semesterId) &&
+      typeOf(item) === (examType === 'Ex' ? 'Ex' : 'Regular');
+  }
+
   function add(entry) {
     const { enrollment, semesterId, semesterName, url, timestamp } = entry;
+    const examType = entry.examType === 'Ex' ? 'Ex' : 'Regular';
     if (!enrollment || !semesterId) return;
 
-    const items = read().filter(
-      (item) => !(item.enrollment === enrollment && item.semesterId === semesterId)
-    );
+    const items = read().filter((item) => !sameEntry(item, enrollment, semesterId, examType));
 
     items.unshift({
       enrollment,
       semesterId,
+      examType,
       semesterName: semesterName || `Semester ${semesterId}`,
       url: url || '',
       timestamp: timestamp || Date.now(),
@@ -45,10 +62,8 @@
     return items;
   }
 
-  function remove(enrollment, semesterId) {
-    const items = read().filter(
-      (item) => !(item.enrollment === enrollment && item.semesterId === semesterId)
-    );
+  function remove(enrollment, semesterId, examType) {
+    const items = read().filter((item) => !sameEntry(item, enrollment, semesterId, examType));
     write(items);
     return items;
   }
@@ -91,7 +106,7 @@
     if (items.length === 0) {
       container.innerHTML = `
         <div class="history-empty">
-          <span class="history-empty-icon">🔍</span>
+          <span class="history-empty-icon" aria-hidden="true">&#128269;</span>
           <p>No recent searches yet</p>
           <span class="history-empty-hint">Your lookup history will appear here</span>
         </div>`;
@@ -101,17 +116,17 @@
     container.innerHTML = items
       .map(
         (item) => `
-        <article class="history-item" data-enrollment="${item.enrollment}" data-semester="${item.semesterId}">
+        <article class="history-item" data-enrollment="${escapeHtml(item.enrollment)}" data-semester="${escapeHtml(item.semesterId)}" data-exam-type="${typeOf(item)}">
           <div class="history-item-main">
-            <span class="history-enrollment">${item.enrollment}</span>
-            <span class="history-semester">${item.semesterName}</span>
+            <span class="history-enrollment">${escapeHtml(item.enrollment)}</span>
+            <span class="history-semester">${escapeHtml(item.semesterName)} &middot; ${typeOf(item) === 'Ex' ? 'Ex / Backlog' : 'Regular'}</span>
           </div>
           <div class="history-item-meta">
             <time datetime="${new Date(item.timestamp).toISOString()}">${formatDate(item.timestamp)}</time>
             <div class="history-actions">
-              <button type="button" class="btn-icon history-reuse" title="Reuse" aria-label="Reuse search">↩</button>
-              <button type="button" class="btn-icon history-open" title="Open result" aria-label="Open result">↗</button>
-              <button type="button" class="btn-icon history-remove" title="Remove" aria-label="Remove from history">×</button>
+              <button type="button" class="btn-icon history-reuse" title="Reuse" aria-label="Reuse search">&#8617;</button>
+              <button type="button" class="btn-icon history-open" title="Open result" aria-label="Open result">&#8599;</button>
+              <button type="button" class="btn-icon history-remove" title="Remove" aria-label="Remove from history">&times;</button>
             </div>
           </div>
         </article>`
@@ -120,12 +135,13 @@
 
     container.querySelectorAll('.history-item').forEach((el) => {
       const enrollment = el.dataset.enrollment;
-      const semesterId = parseInt(el.dataset.semester, 10);
-      const item = items.find((i) => i.enrollment === enrollment && i.semesterId === semesterId);
+      const semesterId = el.dataset.semester;
+      const examType = el.dataset.examType === 'Ex' ? 'Ex' : 'Regular';
+      const item = items.find((i) => sameEntry(i, enrollment, semesterId, examType));
 
       el.querySelector('.history-reuse')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (onSelect) onSelect({ enrollment, semesterId });
+        if (onSelect) onSelect({ enrollment, semesterId, examType });
       });
 
       el.querySelector('.history-open')?.addEventListener('click', (e) => {
@@ -135,12 +151,12 @@
 
       el.querySelector('.history-remove')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        remove(enrollment, semesterId);
+        remove(enrollment, semesterId, examType);
         render(containerId, onSelect);
       });
 
       el.addEventListener('click', () => {
-        if (onSelect) onSelect({ enrollment, semesterId });
+        if (onSelect) onSelect({ enrollment, semesterId, examType });
       });
     });
   }

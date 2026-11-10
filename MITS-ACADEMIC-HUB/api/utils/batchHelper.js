@@ -1,6 +1,6 @@
-﻿/**
+/**
  * Batch Helper — Enrolment-to-Batch Detection & Dynamic Session Generation
- * 
+ *
  * Handles all future batches automatically. No manual config needed.
  * 
  * Enrollment format: BTIT<YY>O<XXXX>
@@ -122,7 +122,39 @@ function getAvailableSemesters(enrollment) {
   });
 }
 
+/**
+ * Server-side table of Ex / Backlog session codes that have been verified
+ * against the real IUMS portal. Never add a code here unless it was observed.
+ *   { <batchYear>: { <semester>: '<sessionCode>' } }
+ */
+const VERIFIED_EX_SESSIONS = Object.freeze({
+  2024: Object.freeze({ 1: '112025' }),
+});
+
+/**
+ * Resolve the IUMS session code from trusted server-side rules only.
+ * Regular -> derived from the batch/semester timeline.
+ * Ex      -> only from VERIFIED_EX_SESSIONS; never guessed.
+ */
+function resolveExamSession(batchYear, semesterNumber, examType) {
+  if (examType === 'Regular') {
+    const info = generateSemesterInfo(batchYear, semesterNumber);
+    return { ok: true, sessionCode: info.sessionCode, source: 'derived' };
+  }
+  if (examType === 'Ex') {
+    const code = VERIFIED_EX_SESSIONS[batchYear] && VERIFIED_EX_SESSIONS[batchYear][semesterNumber];
+    if (code) return { ok: true, sessionCode: code, source: 'verified' };
+    return {
+      ok: false,
+      message: `Verified Ex session code is not available for batch ${batchYear}, semester ${semesterNumber}.`,
+    };
+  }
+  return { ok: false, message: 'Exam type must be Regular or Ex' };
+}
+
 module.exports = {
+  VERIFIED_EX_SESSIONS,
+  resolveExamSession,
   getBatchFromEnrollment,
   generateSemesterInfo,
   getAllSemesters,

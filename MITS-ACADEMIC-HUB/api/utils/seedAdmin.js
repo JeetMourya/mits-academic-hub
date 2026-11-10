@@ -3,20 +3,14 @@
  */
 const Admin = require('../models/Admin');
 
-const DEFAULT_ADMIN = {
-  name: 'MITS Hub Admin',
-  email: 'admin@mitshub.com',
-  password: 'Admin@123',
-  role: 'super_admin',
-  permissions: [
-    'manage_semesters',
-    'manage_results',
-    'manage_users',
-    'view_analytics',
-    'manage_admins',
-    'manage_settings',
-  ],
-};
+const ADMIN_PERMISSIONS = [
+  'manage_semesters',
+  'manage_results',
+  'manage_users',
+  'view_analytics',
+  'manage_admins',
+  'manage_settings',
+];
 
 async function seedDefaultAdmin() {
   const adminCount = await Admin.countDocuments();
@@ -26,9 +20,24 @@ async function seedDefaultAdmin() {
     return null;
   }
 
-  const admin = await Admin.create(DEFAULT_ADMIN);
+  // No hardcoded credentials: the first admin is created only when both
+  // ADMIN_EMAIL and ADMIN_PASSWORD are supplied through the environment.
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password || password.length < 10) {
+    console.warn('Admin seed skipped: set ADMIN_EMAIL and ADMIN_PASSWORD (min 10 chars) to create the first admin.');
+    return null;
+  }
+
+  const admin = await Admin.create({
+    name: process.env.ADMIN_NAME || 'MITS Admin',
+    email,
+    password,
+    role: 'super_admin',
+    permissions: ADMIN_PERMISSIONS,
+  });
   console.log(`Default admin created: ${admin.email}`);
   return admin;
 }
 
-module.exports = { seedDefaultAdmin, DEFAULT_ADMIN };
+module.exports = { seedDefaultAdmin };
