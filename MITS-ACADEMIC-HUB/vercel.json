@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/server.js"
+      "destination": "https://mits-academic-hub.onrender.com/api/:path*"
     },
     {
       "source": "/admin/:path*",
